@@ -1,0 +1,89 @@
+{
+  "id": "pokhara",
+  "cards": [
+    {
+      "id": "pok-photo-phewa",
+      "category": "photograph",
+      "title": "Phewa Lake",
+      "blurb": "Nepal's second-largest lake, with Machhapuchhre reflected in still water at dawn. Painted wooden doongas ferry visitors across.",
+      "points": 70,
+      "toPassport": true
+    },
+    {
+      "id": "pok-photo-barahi",
+      "category": "photograph",
+      "title": "Tal Barahi Temple",
+      "blurb": "A two-tiered pagoda on a small island in the middle of Phewa Lake, dedicated to the boar-headed goddess Barahi.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "pok-photo-sarangkot",
+      "category": "photograph",
+      "title": "Sunrise from Sarangkot",
+      "blurb": "From the ridge above the lake, the sun lights Dhaulagiri, Annapurna and Machhapuchhre one after another.",
+      "points": 80,
+      "toPassport": true
+    },
+    {
+      "id": "pok-photo-davis",
+      "category": "photograph",
+      "title": "Davis Falls",
+      "blurb": "Patale Chhango, where the Pardi Khola vanishes into an underground tunnel. Just across the road, Gupteshwor Mahadev Cave follows the water down.",
+      "points": 50,
+      "toPassport": true
+    },
+    {
+      "id": "pok-photo-shanti",
+      "category": "photograph",
+      "title": "World Peace Stupa",
+      "blurb": "Shanti Stupa crowns the Anadu hill on the far shore of Phewa — the view back over the city and lake is worth the climb.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "pok-souvenir-pashmina",
+      "category": "souvenir",
+      "title": "Pashmina Shawl",
+      "blurb": "Soft cashmere woven from the undercoat of Himalayan mountain goats, bargained for in a Lakeside shop.",
+      "points": 40,
+      "toPassport": true
+    },
+    {
+      "id": "pok-tour-paragliding",
+      "category": "travel-tour",
+      "title": "Paragliding over the Lake",
+      "blurb": "Launch off Sarangkot and spiral down with the eagles. Roll for the thermals — a good one keeps you up for an hour.",
+      "points": 70,
+      "toPassport": true,
+      "minigame": {
+        "type": "dice-off",
+        "target": 6
+      }
+    },
+    {
+      "id": "pok-tour-boating",
+      "category": "travel-tour",
+      "title": "Boating on Phewa",
+      "blurb": "Row yourself out to Tal Barahi, or hire a boatman and arrive dry. Roll to see how straight you steer.",
+      "points": 40,
+      "toPassport": true,
+      "minigame": {
+        "type": "dice-off",
+        "target": 5
+      }
+    },
+    {
+      "id": "pok-duel-zipline",
+      "category": "duel-2v2",
+      "title": "Zipline Race",
+      "blurb": "One of the steepest ziplines in the world drops off Sarangkot. Everyone races — highest roll hits the bottom first.",
+      "points": 50,
+      "toPassport": true,
+      "minigame": {
+        "type": "dice-off",
+        "opponents": "all"
+      }
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "id": "mountain",
+  "cards": [
+    {
+      "id": "mtn-photo-chooyu",
+      "category": "photograph",
+      "title": "Cho Oyu Expedition",
+      "blurb": "Mount Cho Oyu (8,188m) is the 6th highest mountain, sitting on the border of Nepal and Tibet some 30km west. The terrain is uncomplicated and not so dangerous, so it is the most attainable of the world's highest mountains.",
+      "points": 80,
+      "toPassport": true
+    },
+    {
+      "id": "mtn-photo-churen",
+      "category": "photograph",
+      "title": "Churen Himal Expedition",
+      "blurb": "Churen Himal (7,385m). The trail to Churen Himal offers an opportunity to experience undisturbed and tranquil nature full of wild valleys, fast glacial streams and beautiful forest, with wild animals as well as Magar villages and spectacular views of Dhaulagiri, Annapurna, Gurja Himal and Churen Himal.",
+      "points": 70,
+      "toPassport": true
+    },
+    {
+      "id": "mtn-photo-abc-heli",
+      "category": "photograph",
+      "title": "Annapurna B.C. Helicopter Tour",
+      "blurb": "Annapurna Base Camp (4,130m). You need to gain a full understanding of your body's response to altitude, and this helps you gain experience with Himalayan conditions before a bigger mountain expedition. If your body is not made for it, a helicopter tour is your option.",
+      "points": 40,
+      "toPassport": true
+    },
+    {
+      "id": "mtn-photo-pumori",
+      "category": "photograph",
+      "title": "Pumori Expedition",
+      "blurb": "Pumori (7,161m) means 'unmarried daughter' in the Sherpa language. The ascent to Pumori is rewarded with stunning photographic views of snowy mountains including Lhotse and Everest.",
+      "points": 70,
+      "toPassport": true
+    },
+    {
+      "id": "mtn-photo-amadablam",
+      "category": "photograph",
+      "title": "Ama Dablam Expedition",
+      "blurb": "Ama Dablam (6,812m) means 'mother's necklace': the long ridges on each side are like the arms of a mother (ama) protecting her child, and the hanging glacier is thought of as the dablam, the traditional Sherpa pendant. It lies at the heart of the Everest region, perfectly fitting on the path to Everest Base Camp.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "mtn-photo-makalu",
+      "category": "photograph",
+      "title": "Makalu Expedition",
+      "blurb": "Makalu (8,463m) is the 5th highest mountain in the world. Makalu has a distinctive pyramid shape, with its southeast and northwestern ridges being most prominent.",
+      "points": 80,
+      "toPassport": true
+    },
+    {
+      "id": "mtn-photo-himlung",
+      "category": "photograph",
+      "title": "Himlung Expedition",
+      "blurb": "Mount Himlung (7,126m) has been luring a lot of mountaineers recently. Located between Manaslu and Annapurna ranges, the expedition to Mount Himlung takes you through a remote corner of the Nepal and Tibet border.",
+      "points": 70,
+      "toPassport": true
+    },
+    {
+      "id": "mtn-photo-baruntse",
+      "category": "photograph",
+      "title": "Baruntse Expedition",
+      "blurb": "Baruntse (7,162m) lies perfectly between Lhotse and Makalu, at the epicentre of three wild and remote glacial valleys: Barun, Imja and the Hunku. Despite being a 7,000-metre mountain, Baruntse has various components of 8,000-metre high peaks, proving to be an ideal training peak for higher ascends.",
+      "points": 70,
+      "toPassport": true
+    },
+    {
+      "id": "mtn-photo-kangtega",
+      "category": "photograph",
+      "title": "Kangtega Expedition",
+      "blurb": "Kangtega (6,782m) is also known as the snow saddle. It is also one of the major mountain peaks of the Himalayas in Nepal, rising majestically from the Khumbu and Hinku valleys.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "mtn-souvenir-prayerflag",
+      "category": "souvenir",
+      "title": "Lungta Prayer Flags",
+      "blurb": "Strung across every high pass in the Khumbu, the five colours stand for the elements. The wind carries the printed prayers outward as it frays them.",
+      "points": 30,
+      "toPassport": true
+    },
+    {
+      "id": "mtn-tour-sherpaguide",
+      "category": "travel-tour",
+      "title": "Hire a Sherpa Guide",
+      "blurb": "Climb light with a guide who knows the icefall, or carry your own load and save the fee. Roll to see how the ascent goes.",
+      "points": 50,
+      "toPassport": true,
+      "minigame": { "type": "dice-off", "target": 5 }
+    },
+    {
+      "id": "mtn-duel-summitrace",
+      "category": "duel-1v1",
+      "title": "Summit Push Race",
+      "blurb": "Weather window opens for one rope team. Challenge another traveller — highest roll takes the summit photograph.",
+      "points": 60,
+      "toPassport": true,
+      "minigame": { "type": "dice-off", "opponents": "one" }
+    }
+  ]
+}

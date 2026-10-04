@@ -1,0 +1,96 @@
+{
+  "id": "nepalmandal",
+  "cards": [
+    {
+      "id": "nm-photo-swayambhu",
+      "category": "photograph",
+      "title": "Swayambhunath Stupa",
+      "blurb": "The watching eyes of the Buddha look out over the valley from a hilltop said to have risen from a lotus in a primordial lake. 365 stone steps climb to the dome through a resident troop of rhesus macaques.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "nm-photo-durbar",
+      "category": "photograph",
+      "title": "Kathmandu Durbar Square",
+      "blurb": "The old royal palace complex, a crowd of pagoda temples and courtyards in brick and carved sal wood. The Kumari Ghar here houses the living goddess.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "nm-photo-boudha",
+      "category": "photograph",
+      "title": "Boudhanath Stupa",
+      "blurb": "One of the largest spherical stupas in the world and the centre of Tibetan Buddhism in Nepal. Pilgrims walk the kora clockwise at dusk, turning the prayer wheels set into its base.",
+      "points": 70,
+      "toPassport": true
+    },
+    {
+      "id": "nm-photo-pashupati",
+      "category": "photograph",
+      "title": "Pashupatinath Temple",
+      "blurb": "The sacred Hindu temple complex on the banks of the Bagmati, dedicated to Lord Shiva. Sadhus gather on the ghats, and cremation fires burn through the day.",
+      "points": 70,
+      "toPassport": true
+    },
+    {
+      "id": "nm-photo-bhaktapur",
+      "category": "photograph",
+      "title": "Bhaktapur Durbar Square",
+      "blurb": "The best-preserved of the three medieval royal squares, famous for the five-tiered Nyatapola Temple and for juju dhau, the king of curd, served in clay pots.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "nm-photo-patan",
+      "category": "photograph",
+      "title": "Patan Durbar Square",
+      "blurb": "The city of fine arts, where Newar metalworkers still beat statues by hand in the lanes behind the Krishna Mandir's stone shikhara.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "nm-souvenir-thangka",
+      "category": "souvenir",
+      "title": "Thangka Painting",
+      "blurb": "A scroll painting on cotton, mineral pigments ground by hand. A detailed mandala can take an artist months of work in a Patan workshop.",
+      "points": 40,
+      "toPassport": true
+    },
+    {
+      "id": "nm-souvenir-khukuri",
+      "category": "souvenir",
+      "title": "Khukuri",
+      "blurb": "The inward-curving blade carried by the Gorkhas. Forged in Bhojpur and Dharan, it is as much a farm and kitchen tool as a weapon.",
+      "points": 40,
+      "toPassport": true
+    },
+    {
+      "id": "nm-together-newarifeast",
+      "category": "get-together",
+      "title": "Newari Bhoj",
+      "blurb": "Samay baji laid out on a leaf plate — beaten rice, choila, black soybeans, bara. Invite every traveller to the feast; everyone collects the points.",
+      "points": 30,
+      "toPassport": true,
+      "minigame": { "type": "feast", "opponents": "all" }
+    },
+    {
+      "id": "nm-tour-guide",
+      "category": "travel-tour",
+      "title": "Guided Heritage Walk",
+      "blurb": "Walk the old trade route from Thamel to Patan on your own and get lost, or take a guide who can read the toranas above every doorway.",
+      "points": 50,
+      "toPassport": true,
+      "minigame": { "type": "dice-off", "target": 4 }
+    },
+    {
+      "id": "nm-duel-momo",
+      "category": "duel-2v2",
+      "title": "Momo Eating Contest",
+      "blurb": "Jhol momo in a back-alley kitchen in Asan. Everyone plays — highest roll clears the plate.",
+      "points": 40,
+      "toPassport": true,
+      "minigame": { "type": "dice-off", "opponents": "all" }
+    }
+  ]
+}

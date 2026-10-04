@@ -1,0 +1,31 @@
+{
+  "name": "travel-nepal",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "sim": "node --experimental-strip-types src/engine/sim.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p server",
+    "server": "node --experimental-strip-types --disable-warning=ExperimentalWarning server/index.ts",
+    "online": "vite build && node --experimental-strip-types --disable-warning=ExperimentalWarning server/index.ts",
+    "netsim": "node --experimental-strip-types --disable-warning=ExperimentalWarning server/netsim.ts",
+    "start": "node --experimental-strip-types --disable-warning=ExperimentalWarning server/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/ws": "^8.18.2",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "@types/three": "^0.186.0",
+    "three": "^0.186.1",
+    "ws": "^8.22.0"
+  },
+  "engines": {
+    "node": ">=22.6"
+  }
+}

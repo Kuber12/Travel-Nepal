@@ -1,0 +1,81 @@
+{
+  "id": "himalayan",
+  "cards": [
+    {
+      "id": "him-photo-ghandruk",
+      "category": "photograph",
+      "title": "Ghandruk Village",
+      "blurb": "A Gurung village of slate-roofed stone houses, with Annapurna South and Machhapuchhre filling the sky above the terraces.",
+      "points": 70,
+      "toPassport": true
+    },
+    {
+      "id": "him-photo-poonhill",
+      "category": "photograph",
+      "title": "Poon Hill Sunrise",
+      "blurb": "At 3,210 m, the most famous viewpoint on the Annapurna circuit — a panorama from Dhaulagiri to Annapurna I.",
+      "points": 80,
+      "toPassport": true
+    },
+    {
+      "id": "him-photo-ghorepani",
+      "category": "photograph",
+      "title": "Ghorepani Rhododendrons",
+      "blurb": "In spring the forest above Ghorepani turns red and pink with laliguras, Nepal's national flower.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "him-photo-sikles",
+      "category": "photograph",
+      "title": "Sikles Village",
+      "blurb": "One of the largest Gurung settlements, a cluster of stone houses on a ridge facing Lamjung Himal.",
+      "points": 50,
+      "toPassport": true
+    },
+    {
+      "id": "him-souvenir-gurung",
+      "category": "souvenir",
+      "title": "Gurung Bhangra Shawl",
+      "blurb": "A handwoven nettle-fibre wrap worn over the shoulder, a traditional Gurung garment.",
+      "points": 30,
+      "toPassport": true
+    },
+    {
+      "id": "him-tour-homestay",
+      "category": "travel-tour",
+      "title": "Gurung Homestay",
+      "blurb": "Stay with a family in the village, or pitch a tent outside it. Roll to see how warm a welcome you get.",
+      "points": 50,
+      "toPassport": true,
+      "minigame": {
+        "type": "dice-off",
+        "target": 5
+      }
+    },
+    {
+      "id": "him-together-rodhi",
+      "category": "get-together",
+      "title": "Rodhi Ghar Evening",
+      "blurb": "Songs and dancing around the fire in the village rodhi house. Everyone at the table collects.",
+      "points": 30,
+      "toPassport": true,
+      "minigame": {
+        "type": "feast",
+        "opponents": "all"
+      }
+    },
+    {
+      "id": "him-duel-teahouse",
+      "category": "duel-1v1",
+      "title": "Tea-House Race",
+      "blurb": "First to the next tea house gets the warm room. Challenge one traveller — highest roll wins the bed.",
+      "points": 40,
+      "toPassport": true,
+      "minigame": {
+        "type": "dice-off",
+        "opponents": "one"
+      }
+    }
+  ]
+}

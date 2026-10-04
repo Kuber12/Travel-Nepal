@@ -1,0 +1,89 @@
+{
+  "id": "eastern",
+  "cards": [
+    {
+      "id": "eas-photo-ilam",
+      "category": "photograph",
+      "title": "Ilam Tea Gardens",
+      "blurb": "Rolling hills of manicured tea bushes in Nepal's far east. Ilam's orthodox teas are sold around the world.",
+      "points": 70,
+      "toPassport": true
+    },
+    {
+      "id": "eas-photo-kanchenjunga",
+      "category": "photograph",
+      "title": "Kanchenjunga",
+      "blurb": "At 8,586 m, the third-highest mountain on Earth, straddling the border of Nepal and Sikkim. Its base camp trek is one of the wildest in the country.",
+      "points": 90,
+      "toPassport": true
+    },
+    {
+      "id": "eas-photo-koshi",
+      "category": "photograph",
+      "title": "Koshi Tappu Wildlife Reserve",
+      "blurb": "Wetlands on the Sapta Koshi floodplain, home to the last wild water buffalo (arna) in Nepal and hundreds of bird species.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "eas-photo-antu",
+      "category": "photograph",
+      "title": "Antu Danda Sunrise",
+      "blurb": "The hilltop near the Indian border where the sun climbs out of a sea of cloud over the tea gardens.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "eas-photo-pathibhara",
+      "category": "photograph",
+      "title": "Pathibhara Devi",
+      "blurb": "A hilltop shrine above Taplejung at 3,794 m, one of the most important pilgrimage sites in the east.",
+      "points": 50,
+      "toPassport": true
+    },
+    {
+      "id": "eas-souvenir-tea",
+      "category": "souvenir",
+      "title": "Ilam First-Flush Tea",
+      "blurb": "A tin of the first spring picking — light, floral, and the pride of the eastern hills.",
+      "points": 30,
+      "toPassport": true
+    },
+    {
+      "id": "eas-tour-teapick",
+      "category": "travel-tour",
+      "title": "Tea-Picking with the Pickers",
+      "blurb": "Join the pickers on the slopes at dawn: two leaves and a bud. Roll to fill your basket.",
+      "points": 50,
+      "toPassport": true,
+      "minigame": {
+        "type": "dice-off",
+        "target": 5
+      }
+    },
+    {
+      "id": "eas-together-kinema",
+      "category": "get-together",
+      "title": "Kinema and Tongba",
+      "blurb": "Fermented soybean curry and hot millet beer sipped through a bamboo straw. Everyone at the table collects.",
+      "points": 30,
+      "toPassport": true,
+      "minigame": {
+        "type": "feast",
+        "opponents": "all"
+      }
+    },
+    {
+      "id": "eas-duel-chhurpi",
+      "category": "duel-1v1",
+      "title": "Chhurpi Chewing Contest",
+      "blurb": "Hard yak-cheese chhurpi can last an hour. Challenge one traveller — highest roll finishes theirs first.",
+      "points": 40,
+      "toPassport": true,
+      "minigame": {
+        "type": "dice-off",
+        "opponents": "one"
+      }
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "id": "vertical-slice",
+  "startNode": "AIR-00",
+  "nodes": [
+    { "id": "AIR-00", "section": "airport", "kind": "start", "next": ["NM-01"], "pos": [-14.0, 0, 12], "label": "Tribhuvan International Airport" },
+
+    { "id": "NM-01", "section": "nepalmandal", "kind": "path", "next": ["NM-02"], "pos": [-11.8, 0, 12] },
+    { "id": "NM-02", "section": "nepalmandal", "kind": "path", "next": ["NM-03"], "pos": [-9.6, 0, 12] },
+    { "id": "NM-03", "section": "nepalmandal", "kind": "path", "next": ["NM-CP1"], "pos": [-7.4, 0, 12] },
+    { "id": "NM-CP1", "section": "nepalmandal", "kind": "checkpoint", "next": ["NM-04"], "pos": [-5.2, 0, 12], "label": "Thamel Checkpoint", "ticketReward": "mountain" },
+    { "id": "NM-04", "section": "nepalmandal", "kind": "path", "next": ["NM-05"], "pos": [-3.0, 0, 12] },
+    { "id": "NM-05", "section": "nepalmandal", "kind": "path", "next": ["TC-01"], "pos": [-0.8, 0, 12] },
+    { "id": "TC-01", "section": "nepalmandal", "kind": "ticket-counter", "next": ["NM-06"], "pos": [1.4, 0, 12], "label": "Ticket Counter" },
+    { "id": "NM-06", "section": "nepalmandal", "kind": "path", "next": ["NM-07"], "pos": [3.6, 0, 12] },
+    { "id": "NM-07", "section": "nepalmandal", "kind": "path", "next": ["JN-01"], "pos": [5.8, 0, 12] },
+    { "id": "JN-01", "section": "nepalmandal", "kind": "junction", "next": ["MTN-01", "NM-08"], "pos": [8.0, 0, 12], "label": "Junction" },
+
+    { "id": "MTN-01", "section": "mountain", "kind": "path", "next": ["MTN-02"], "pos": [10.6, 0, 13.4], "requiresTicket": "mountain", "label": "Mountain Expedition" },
+    { "id": "MTN-02", "section": "mountain", "kind": "path", "next": ["MTN-03"], "pos": [12.4, 0, 15.4] },
+    { "id": "MTN-03", "section": "mountain", "kind": "path", "next": ["MTN-CP1"], "pos": [13.0, 0, 18.0] },
+    { "id": "MTN-CP1", "section": "mountain", "kind": "checkpoint", "next": ["MTN-04"], "pos": [11.8, 0, 20.2], "label": "High Camp Checkpoint" },
+    { "id": "MTN-04", "section": "mountain", "kind": "path", "next": ["MTN-05"], "pos": [9.4, 0, 21.0] },
+    { "id": "MTN-05", "section": "mountain", "kind": "path", "next": ["MTN-06"], "pos": [7.0, 0, 20.2] },
+    { "id": "MTN-06", "section": "mountain", "kind": "path", "next": ["MTN-07"], "pos": [5.6, 0, 18.0] },
+    { "id": "MTN-07", "section": "mountain", "kind": "path", "next": ["NM-08"], "pos": [5.8, 0, 15.4] },
+
+    { "id": "NM-08", "section": "nepalmandal", "kind": "path", "next": ["NM-09"], "pos": [8.0, 0, 9.0] },
+    { "id": "NM-09", "section": "nepalmandal", "kind": "path", "next": ["NM-CP2"], "pos": [8.0, 0, 6.4] },
+    { "id": "NM-CP2", "section": "nepalmandal", "kind": "checkpoint", "next": ["CHT-01"], "pos": [6.6, 0, 4.0], "label": "Thankot Checkpoint", "ticketReward": "mountain" },
+
+    { "id": "CHT-01", "section": "chitwan", "kind": "path", "next": ["CHT-02"], "pos": [4.4, 0, 4], "label": "Chitwan Tour" },
+    { "id": "CHT-02", "section": "chitwan", "kind": "path", "next": ["CHT-03"], "pos": [2.2, 0, 4] },
+    { "id": "CHT-03", "section": "chitwan", "kind": "path", "next": ["CHT-CP1"], "pos": [0.0, 0, 4] },
+    { "id": "CHT-CP1", "section": "chitwan", "kind": "checkpoint", "next": ["CHT-04"], "pos": [-2.2, 0, 4], "label": "Sauraha Checkpoint" },
+    { "id": "CHT-04", "section": "chitwan", "kind": "path", "next": ["CHT-05"], "pos": [-4.4, 0, 4] },
+    { "id": "CHT-05", "section": "chitwan", "kind": "path", "next": ["CHT-06"], "pos": [-6.6, 0, 4] },
+    { "id": "CHT-06", "section": "chitwan", "kind": "path", "next": ["CHT-07"], "pos": [-8.8, 0, 4] },
+    { "id": "CHT-07", "section": "chitwan", "kind": "path", "next": ["CHT-END"], "pos": [-11.0, 0, 4] },
+    { "id": "CHT-END", "section": "chitwan", "kind": "terminus", "next": [], "pos": [-13.2, 0, 4], "label": "Departure" }
+  ]
+}

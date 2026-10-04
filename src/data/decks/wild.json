@@ -1,0 +1,59 @@
+{
+  "id": "wild",
+  "cards": [
+    {
+      "id": "wild-bike-1",
+      "category": "wild",
+      "title": "Hire a Bike",
+      "blurb": "You have rented a bike for the road ahead. For your next five turns each spin of the prayer wheel is halved, so you travel slower and spend more time in Nepal.",
+      "points": 0,
+      "toPassport": false,
+      "effect": "hire-a-bike"
+    },
+    {
+      "id": "wild-bike-2",
+      "category": "wild",
+      "title": "Hire a Bike",
+      "blurb": "You have rented a bike for the road ahead. For your next five turns each spin of the prayer wheel is halved, so you travel slower and spend more time in Nepal.",
+      "points": 0,
+      "toPassport": false,
+      "effect": "hire-a-bike"
+    },
+    {
+      "id": "wild-homesick-1",
+      "category": "wild",
+      "title": "Home Sick",
+      "blurb": "You are missing home. Move ten steps forward — your vacation days are cut short.",
+      "points": 0,
+      "toPassport": false,
+      "effect": "homesick"
+    },
+    {
+      "id": "wild-dutycall-1",
+      "category": "wild",
+      "title": "Duty Call",
+      "blurb": "The boss is on the phone and needs you back. Move ten steps forward — your vacation days are cut short.",
+      "points": 0,
+      "toPassport": false,
+      "effect": "homesick"
+    },
+    {
+      "id": "wild-extend-1",
+      "category": "wild",
+      "title": "Extend Vacation",
+      "blurb": "You are enjoying Nepal too much to leave. Move ten steps backwards and keep travelling.",
+      "points": 0,
+      "toPassport": false,
+      "effect": "extend-vacation"
+    },
+    {
+      "id": "wild-extend-2",
+      "category": "wild",
+      "title": "Extend Vacation",
+      "blurb": "You are enjoying Nepal too much to leave. Move ten steps backwards and keep travelling.",
+      "points": 0,
+      "toPassport": false,
+      "effect": "extend-vacation"
+    }
+  ]
+}

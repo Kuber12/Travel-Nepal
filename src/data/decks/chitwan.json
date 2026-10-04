@@ -1,0 +1,80 @@
+{
+  "id": "chitwan",
+  "cards": [
+    {
+      "id": "cht-photo-rhino",
+      "category": "photograph",
+      "title": "One-Horned Rhinoceros",
+      "blurb": "Chitwan National Park holds the second largest population of the greater one-horned rhino. From under 100 animals in the 1960s, protection has brought the park's count back above 600.",
+      "points": 80,
+      "toPassport": true
+    },
+    {
+      "id": "cht-photo-tiger",
+      "category": "photograph",
+      "title": "Royal Bengal Tiger",
+      "blurb": "Seeing one is mostly luck and pugmarks. The park's tigers move through tall elephant grass that stands higher than a person on foot.",
+      "points": 90,
+      "toPassport": true
+    },
+    {
+      "id": "cht-photo-gharial",
+      "category": "photograph",
+      "title": "Gharial Crocodile",
+      "blurb": "The narrow-snouted fish eater of the Rapti and Narayani rivers, critically endangered. The breeding centre at Kasara raises and releases them each year.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "cht-photo-canoe",
+      "category": "photograph",
+      "title": "Dugout Canoe on the Rapti",
+      "blurb": "A hollowed sal-trunk canoe drifts past basking muggers and kingfishers at first light, with the Churia hills behind.",
+      "points": 50,
+      "toPassport": true
+    },
+    {
+      "id": "cht-photo-tharu",
+      "category": "photograph",
+      "title": "Tharu Stick Dance",
+      "blurb": "The indigenous Tharu people of the inner Terai perform the lathi naach in a ring of drums, striking staves in time.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "cht-souvenir-tharumask",
+      "category": "souvenir",
+      "title": "Tharu Painted Mask",
+      "blurb": "Painted clay and papier-mâché masks from the villages around Sauraha, made for festival dances and sold at the roadside.",
+      "points": 30,
+      "toPassport": true
+    },
+    {
+      "id": "cht-tour-jeepsafari",
+      "category": "travel-tour",
+      "title": "Jungle Jeep Safari",
+      "blurb": "Take the jeep deep into the core area with a naturalist, or walk the buffer zone alone and hope the rhino is in a good mood. Roll for your sighting.",
+      "points": 60,
+      "toPassport": true,
+      "minigame": { "type": "dice-off", "target": 5 }
+    },
+    {
+      "id": "cht-together-tharufeast",
+      "category": "get-together",
+      "title": "Tharu Village Dinner",
+      "blurb": "Ghonghi snails, dhikri and bagiya served in a mud-walled Tharu home. Everyone at the table collects.",
+      "points": 30,
+      "toPassport": true,
+      "minigame": { "type": "feast", "opponents": "all" }
+    },
+    {
+      "id": "cht-duel-birdcount",
+      "category": "duel-1v1",
+      "title": "Birding Count-Off",
+      "blurb": "Over 500 bird species live in the park. Challenge one traveller — highest roll logs the longer list.",
+      "points": 50,
+      "toPassport": true,
+      "minigame": { "type": "dice-off", "opponents": "one" }
+    }
+  ]
+}

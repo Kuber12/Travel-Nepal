@@ -1,0 +1,77 @@
+{
+  "id": "westernhillside",
+  "cards": [
+    {
+      "id": "whl-photo-bandipur",
+      "category": "photograph",
+      "title": "Bandipur Bazaar",
+      "blurb": "A Newar trading town frozen in time on a saddle above the highway, with car-free streets and a view of the whole Himalayan range.",
+      "points": 70,
+      "toPassport": true
+    },
+    {
+      "id": "whl-photo-gorkha",
+      "category": "photograph",
+      "title": "Gorkha Durbar",
+      "blurb": "The hilltop palace of King Prithvi Narayan Shah, from where the unification of Nepal began in the 18th century.",
+      "points": 70,
+      "toPassport": true
+    },
+    {
+      "id": "whl-photo-tansen",
+      "category": "photograph",
+      "title": "Tansen and Rani Mahal",
+      "blurb": "Hill town of Palpa, and the riverside 'Taj Mahal of Nepal' built by a general for his late wife on the Kali Gandaki.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "whl-photo-rara",
+      "category": "photograph",
+      "title": "Rara Lake",
+      "blurb": "Nepal's largest lake, deep blue at 2,990 m in the remote north-west, ringed by pine and juniper.",
+      "points": 80,
+      "toPassport": true
+    },
+    {
+      "id": "whl-souvenir-dhaka",
+      "category": "souvenir",
+      "title": "Palpali Dhaka Topi",
+      "blurb": "The patterned cap woven on handlooms in Palpa — part of Nepal's national dress.",
+      "points": 30,
+      "toPassport": true
+    },
+    {
+      "id": "whl-souvenir-karuwa",
+      "category": "souvenir",
+      "title": "Palpali Karuwa",
+      "blurb": "A bronze water jug cast by Palpa's metalworkers, given at weddings and festivals.",
+      "points": 30,
+      "toPassport": true
+    },
+    {
+      "id": "whl-tour-cave",
+      "category": "travel-tour",
+      "title": "Siddha Cave",
+      "blurb": "One of the largest caves in Nepal, below Bandipur. Take a guide and torch, or feel your way. Roll for how deep you go.",
+      "points": 50,
+      "toPassport": true,
+      "minigame": {
+        "type": "dice-off",
+        "target": 5
+      }
+    },
+    {
+      "id": "whl-duel-ridge",
+      "category": "duel-1v1",
+      "title": "Ridge Walk Race",
+      "blurb": "Race one traveller along the ridge to Thani Mai temple for the sunrise. Highest roll gets there first.",
+      "points": 40,
+      "toPassport": true,
+      "minigame": {
+        "type": "dice-off",
+        "opponents": "one"
+      }
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "id": "westernterai",
+  "cards": [
+    {
+      "id": "wtr-photo-bardiya",
+      "category": "photograph",
+      "title": "Bardiya National Park",
+      "blurb": "The largest untouched wilderness in the Terai, where tigers, wild elephants and rhinos roam the sal forest and grasslands.",
+      "points": 80,
+      "toPassport": true
+    },
+    {
+      "id": "wtr-photo-karnali",
+      "category": "photograph",
+      "title": "Karnali River",
+      "blurb": "Nepal's longest river spills out of the hills at Chisapani; gangetic river dolphins are sometimes seen in its waters.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "wtr-photo-shuklaphanta",
+      "category": "photograph",
+      "title": "Shuklaphanta Grasslands",
+      "blurb": "The far-western park holds one of the largest herds of swamp deer in the world on its open phanta grasslands.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "wtr-photo-ghodaghodi",
+      "category": "photograph",
+      "title": "Ghodaghodi Lake",
+      "blurb": "A chain of oxbow lakes in Kailali, a Ramsar wetland rich in birds, turtles and mugger crocodiles.",
+      "points": 50,
+      "toPassport": true
+    },
+    {
+      "id": "wtr-souvenir-basket",
+      "category": "souvenir",
+      "title": "Tharu Grass Basket",
+      "blurb": "A colourful basket woven from local grasses by Tharu women of the western plains.",
+      "points": 30,
+      "toPassport": true
+    },
+    {
+      "id": "wtr-tour-tigertrack",
+      "category": "travel-tour",
+      "title": "Tiger Tracking on Foot",
+      "blurb": "Follow a naturalist along the river beds at dawn, looking for fresh pugmarks. Roll for your sighting.",
+      "points": 70,
+      "toPassport": true,
+      "minigame": {
+        "type": "dice-off",
+        "target": 6
+      }
+    },
+    {
+      "id": "wtr-tour-rafting",
+      "category": "travel-tour",
+      "title": "Karnali Rafting",
+      "blurb": "Run the big water of the Karnali, or watch from the bank. Roll to stay in the boat.",
+      "points": 50,
+      "toPassport": true,
+      "minigame": {
+        "type": "dice-off",
+        "target": 5
+      }
+    },
+    {
+      "id": "wtr-duel-maghi",
+      "category": "duel-2v2",
+      "title": "Maghi Dance-Off",
+      "blurb": "The Tharu new year festival, with dancing all night. Everyone joins — highest roll leads the ring.",
+      "points": 40,
+      "toPassport": true,
+      "minigame": {
+        "type": "dice-off",
+        "opponents": "all"
+      }
+    }
+  ]
+}

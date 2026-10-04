@@ -1,0 +1,89 @@
+{
+  "id": "lumbini",
+  "cards": [
+    {
+      "id": "lum-photo-mayadevi",
+      "category": "photograph",
+      "title": "Maya Devi Temple",
+      "blurb": "The white temple built over the marker stone said to show the exact spot where Siddhartha Gautama was born, in 623 BC by tradition. A UNESCO World Heritage Site.",
+      "points": 80,
+      "toPassport": true
+    },
+    {
+      "id": "lum-photo-ashoka",
+      "category": "photograph",
+      "title": "Ashoka Pillar",
+      "blurb": "Emperor Ashoka of the Maurya dynasty raised this sandstone pillar on his pilgrimage in 249 BC. Its Brahmi inscription is the oldest evidence of Lumbini as the Buddha's birthplace.",
+      "points": 70,
+      "toPassport": true
+    },
+    {
+      "id": "lum-photo-pond",
+      "category": "photograph",
+      "title": "Puskarini Sacred Pond",
+      "blurb": "The pond where Queen Maya Devi is said to have bathed before giving birth, and where the infant Buddha was given his first bath.",
+      "points": 50,
+      "toPassport": true
+    },
+    {
+      "id": "lum-photo-peace",
+      "category": "photograph",
+      "title": "World Peace Pagoda",
+      "blurb": "A gleaming white stupa built by Japanese Buddhists at the northern end of the monastic zone, with a golden Buddha in each niche.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "lum-photo-monastic",
+      "category": "photograph",
+      "title": "Monastic Zone",
+      "blurb": "Monasteries from Thailand, Myanmar, China, Germany and more stand either side of a long canal — the whole Buddhist world in one walk.",
+      "points": 60,
+      "toPassport": true
+    },
+    {
+      "id": "lum-souvenir-beads",
+      "category": "souvenir",
+      "title": "Bodhi Seed Mala",
+      "blurb": "A string of 108 prayer beads made from bodhi seeds, sold by the stalls at the edge of the sacred garden.",
+      "points": 30,
+      "toPassport": true
+    },
+    {
+      "id": "lum-tour-cycle",
+      "category": "travel-tour",
+      "title": "Cycle the Sacred Garden",
+      "blurb": "Hire a bicycle and cover the monastic zone before the midday heat, or walk it and see half. Roll for how far you get.",
+      "points": 50,
+      "toPassport": true,
+      "minigame": {
+        "type": "dice-off",
+        "target": 5
+      }
+    },
+    {
+      "id": "lum-together-dalbhat",
+      "category": "get-together",
+      "title": "Dal Bhat at the Dharamsala",
+      "blurb": "Lentils, rice, tarkari and achar, refilled until you say stop. Everyone at the table collects.",
+      "points": 30,
+      "toPassport": true,
+      "minigame": {
+        "type": "feast",
+        "opponents": "all"
+      }
+    },
+    {
+      "id": "lum-duel-meditation",
+      "category": "duel-1v1",
+      "title": "Meditation Stillness Challenge",
+      "blurb": "Who can sit still the longest under the bodhi tree? Challenge one traveller — highest roll keeps their calm.",
+      "points": 40,
+      "toPassport": true,
+      "minigame": {
+        "type": "dice-off",
+        "opponents": "one"
+      }
+    }
+  ]
+}
