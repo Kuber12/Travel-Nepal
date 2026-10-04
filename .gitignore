@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude session snapshots and screenshots — not part of the app
+Claude outputs/

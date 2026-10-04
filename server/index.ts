@@ -365,7 +365,17 @@ const http = createServer((req, res) => {
     res.end('Travel Nepal room server is running. Build the game with `npm run build`, or use `npm run dev` for development.');
     return;
   }
-  const safe = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '');
+  // A malformed escape (e.g. "/%E0%A4%A") makes decodeURIComponent throw; on a
+  // public host that must be a 400, not a crash that takes every room down.
+  let pathname: string;
+  try {
+    pathname = decodeURIComponent(url.pathname);
+  } catch {
+    res.writeHead(400, { 'content-type': 'text/plain' });
+    res.end('Bad request');
+    return;
+  }
+  const safe = normalize(pathname).replace(/^(\.\.[/\\])+/, '');
   let file = join(DIST, safe);
   if (!file.startsWith(DIST) || !existsSync(file) || statSync(file).isDirectory()) file = join(DIST, 'index.html');
   res.writeHead(200, {
