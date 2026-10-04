@@ -88,8 +88,11 @@ Then open http://localhost:8787. Friends on the same Wi-Fi open
 one terminal and `npm run dev` in another — Vite proxies `/ws` to the server.
 
 To play over the internet, deploy it as one web service — for example on
-Render: **Build command** `npm install && npm run build`, **Start command**
-`npm start` (Node 22.6+). The server reads `PORT` from the environment.
+Render (a `render.yaml` blueprint is included): **Build command**
+`npm install --include=dev && npm run build`, **Start command** `npm start`,
+Node 22.6+. The server reads `PORT` from the environment. Don't use
+`npm run dev` as the start command on a host: that's the Vite dev server, which
+has no rooms (and blocks unknown hostnames).
 
 How it works (`server/index.ts`, `src/net/`):
 

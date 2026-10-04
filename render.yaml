@@ -1,0 +1,13 @@
+# Render blueprint: one web service that builds the game and runs the room
+# server, which serves the built game and the multiplayer WebSocket together.
+services:
+  - type: web
+    name: travel-nepal
+    runtime: node
+    plan: free
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.12.0
