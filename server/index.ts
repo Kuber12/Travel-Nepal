@@ -40,10 +40,13 @@ import wild from '../src/data/decks/wild.json' with { type: 'json' };
 import { nextAction } from '../src/engine/autoplay.ts';
 import type { DeckFile } from '../src/engine/decks.ts';
 import { applyAction, current } from '../src/engine/reducer.ts';
-import { newGame, TRAVELERS, type BoardFile } from '../src/engine/setup.ts';
-import type { Action, GameState } from '../src/engine/types.ts';
+import { HAT_STYLES, newGame, TRAVELER_COLORS, TRAVELERS, type BoardFile } from '../src/engine/setup.ts';
+import type { Action, GameState, HatStyle } from '../src/engine/types.ts';
 import { checksum, type ClientMessage, type LobbyPlayer, type ServerMessage } from '../src/net/protocol.ts';
 import { judge, participantsFor } from '../src/ui/minigames/pick.ts';
+import { aiMove, applyBagh, newBagh, type BaghMove } from '../src/fun/baghchal.ts';
+import { funGame, raceWinners, type FunPublic } from '../src/fun/chautari.ts';
+import { newTug, pullTug, TUG_MAX_TAPS_PER_SECOND, type TugState } from '../src/fun/tug.ts';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const DIST = fileURLToPath(new URL('../dist/', import.meta.url));
@@ -60,12 +63,24 @@ const BOT_STEP_MS = 1_600;
 const MINIGAME_LIMIT_MS = 150_000;
 /** Empty rooms are kept this long, so a refresh doesn't lose the game. */
 const ROOM_TTL_MS = 30 * 60_000;
+/** Chautari: how long invited players have to join a friendly game. */
+const FUN_READY_MS = 25_000;
+/** Chautari: longest a score race waits for everyone's round. */
+const FUN_RACE_MS = 150_000;
+/** Chautari: a Bagh-Chal move left this long is played by the computer. */
+const FUN_MOVE_MS = 45_000;
+/** Chautari: an absent Bagh-Chal player's move is played after this pause. */
+const FUN_AWAY_MOVE_MS = 3_000;
+/** Chautari: the "3, 2, 1" before a tug of war. */
+const FUN_TUG_COUNTDOWN_MS = 3_000;
 
 // --- rooms -------------------------------------------------------------------
 
 type Seat = {
   seat: number;
   name: string;
+  color: string;
+  hat: HatStyle;
   token: string;
   socket: WebSocket | null;
   awaySince: number | null;
@@ -81,6 +96,21 @@ type Room = {
   emptySince: number | null;
   /** When the autopilot last moved for an absent traveler. */
   botAt: number;
+  /** The Chautari match being played, if any. The journey waits while it runs. */
+  fun: FunRoom | null;
+  funCount: number;
+};
+
+/** The server's side of a Chautari match: the public state plus timers and the live rope. */
+type FunRoom = {
+  pub: FunPublic;
+  /** Ready: join deadline. Race: last call for scores. Bagh-Chal: this move's deadline. */
+  deadline: number;
+  /** Tug of war: the rope, the taps waiting to be applied, and when it last moved. */
+  tug: TugState | null;
+  taps: [number, number];
+  tugAt: number;
+  rnd: () => number;
 };
 
 const rooms = new Map<string, Room>();
@@ -107,7 +137,8 @@ function lobbyOf(room: Room): LobbyPlayer[] {
   return room.seats.map((s) => ({
     seat: s.seat,
     name: s.name,
-    color: TRAVELERS[s.seat].color,
+    color: s.color,
+    hat: s.hat,
     connected: Boolean(s.socket),
     host: s.seat === room.hostSeat,
   }));
@@ -115,6 +146,15 @@ function lobbyOf(room: Room): LobbyPlayer[] {
 
 function sendLobby(room: Room): void {
   broadcast(room, { t: 'lobby', code: room.code, players: lobbyOf(room), started: Boolean(room.state) });
+}
+
+/** A new traveler's look: the box colour for their seat, or the first one nobody is wearing. */
+function freshLook(room: Room, index: number): { color: string; hat: HatStyle } {
+  const worn = room.seats.map((s) => s.color);
+  const color = worn.includes(TRAVELERS[index].color)
+    ? TRAVELER_COLORS.find((c) => !worn.includes(c)) ?? TRAVELERS[index].color
+    : TRAVELERS[index].color;
+  return { color, hat: TRAVELERS[index].hat };
 }
 
 function cleanName(raw: unknown, fallback: string): string {
@@ -146,9 +186,10 @@ function commit(room: Room, action: Action, by: number | null): boolean {
 
 function handleAction(room: Room, seat: number, action: Action): void {
   const state = room.state;
-  if (!state || room.minigame) return;
+  if (!state || room.minigame || room.fun) return; // the journey waits for the Chautari
   if (current(state).id !== seat) return; // not your turn
   if (action.type === 'MOVE_COMPLETE') return; // the server chains these itself
+  if (action.type === 'CHAUTARI_RESULT') return; // only the server hands out medals
 
   if (action.type === 'PLAY_MINIGAME') {
     const pending = state.pendingMinigame;
@@ -210,6 +251,244 @@ function checkMinigame(room: Room): void {
   }
 }
 
+
+// --- the Chautari: friendly games between turns ------------------------------------
+
+function seeded(seed: number): () => number {
+  let s = seed >>> 0 || 1;
+  return () => {
+    s = (s * 1664525 + 1013904223) % 4294967296;
+    return s / 4294967296;
+  };
+}
+
+function sendFun(room: Room): void {
+  broadcast(room, { t: 'fun', fun: room.fun ? room.fun.pub : null });
+}
+
+function openFun(room: Room, seat: number, gameId: string, wanted: unknown): void {
+  const state = room.state;
+  if (!state || room.minigame || room.fun) return;
+  if (state.phase !== 'await-roll' && state.phase !== 'game-over') return;
+  const game = funGame(String(gameId));
+  if (!game || !Array.isArray(wanted)) return;
+  const participants = [...new Set(wanted.map(Number))].filter(
+    (p) => Number.isInteger(p) && room.seats[p]?.socket && state.players.some((pl) => pl.id === p),
+  );
+  if (participants.length < game.min || participants.length > game.max || participants.length !== wanted.length) {
+    const s = room.seats[seat];
+    send(s?.socket ?? null, { t: 'error', message: 'Those travelers can’t all play right now.' });
+    return;
+  }
+  room.funCount++;
+  room.fun = {
+    pub: {
+      id: room.funCount,
+      game: game.id,
+      host: seat,
+      seed: Math.floor(Math.random() * 0x7fffffff),
+      participants,
+      stage: 'ready',
+      ready: participants.includes(seat) ? [seat] : [],
+      out: [],
+      scores: [],
+    },
+    deadline: Date.now() + FUN_READY_MS,
+    tug: null,
+    taps: [0, 0],
+    tugAt: 0,
+    rnd: seeded(room.funCount * 7919 + Date.now()),
+  };
+  checkReady(room);
+}
+
+/** Everyone has answered (or the clock ran out): start, or call it off. */
+function checkReady(room: Room): void {
+  const fun = room.fun;
+  if (!fun || fun.pub.stage !== 'ready') return;
+  const pub = fun.pub;
+  const timedOut = Date.now() > fun.deadline;
+  for (const p of pub.participants) {
+    const answered = pub.ready.includes(p) || pub.out.includes(p);
+    if (!answered && (timedOut || !room.seats[p]?.socket)) pub.out.push(p);
+  }
+  if (!pub.participants.every((p) => pub.ready.includes(p) || pub.out.includes(p))) {
+    sendFun(room);
+    return;
+  }
+  const game = funGame(pub.game)!;
+  const players = pub.participants.filter((p) => pub.ready.includes(p));
+  if (players.length < game.min || (game.kind !== 'race' && players.length < 2)) {
+    const missing = pub.out.map((p) => room.seats[p]?.name ?? '?').join(' & ');
+    finishFun(room, [], missing ? `${missing} sat this one out.` : 'Called off.');
+    return;
+  }
+  pub.participants = players;
+  pub.stage = 'play';
+  if (game.kind === 'race') {
+    fun.deadline = Date.now() + FUN_RACE_MS;
+  } else if (game.kind === 'baghchal') {
+    pub.bagh = newBagh();
+    pub.sides = { T: players[0], G: players[1] };
+    fun.deadline = Date.now() + FUN_MOVE_MS;
+  } else {
+    fun.tug = newTug();
+    fun.tugAt = Date.now() + FUN_TUG_COUNTDOWN_MS;
+    pub.tug = { pos: 0, t: -FUN_TUG_COUNTDOWN_MS / 1000, pullers: [players[0], players[1]] };
+  }
+  sendFun(room);
+}
+
+/** The match is over: tell everyone, hand out medals through the game itself, and let the journey go on. */
+function finishFun(room: Room, winners: number[], note?: string): void {
+  const fun = room.fun;
+  if (!fun) return;
+  fun.pub.stage = 'done';
+  fun.pub.winners = winners;
+  if (note) fun.pub.note = note;
+  sendFun(room);
+  room.fun = null;
+  const game = funGame(fun.pub.game);
+  if (winners.length > 0 && fun.pub.participants.length > 1 && game) {
+    commit(room, { type: 'CHAUTARI_RESULT', game: game.title, winners }, null);
+  }
+}
+
+function funReady(room: Room, seat: number, join: boolean): void {
+  const pub = room.fun?.pub;
+  if (!pub || pub.stage !== 'ready' || !pub.participants.includes(seat)) return;
+  if (pub.ready.includes(seat) || pub.out.includes(seat)) return;
+  (join ? pub.ready : pub.out).push(seat);
+  checkReady(room);
+}
+
+function funScore(room: Room, seat: number, score: unknown, summary: unknown): void {
+  const pub = room.fun?.pub;
+  if (!pub || pub.stage !== 'play' || funGame(pub.game)?.kind !== 'race') return;
+  if (!pub.participants.includes(seat) || pub.scores.some((s) => s.seat === seat)) return;
+  pub.scores.push({ seat, score: Math.max(0, Math.min(100_000, Math.round(Number(score) || 0))), summary: String(summary ?? '').slice(0, 80) });
+  checkRace(room);
+}
+
+function checkRace(room: Room): void {
+  const fun = room.fun;
+  if (!fun || fun.pub.stage !== 'play') return;
+  const pub = fun.pub;
+  const timedOut = Date.now() > fun.deadline;
+  for (const p of pub.participants) {
+    if (!pub.scores.some((s) => s.seat === p) && (timedOut || !room.seats[p]?.socket)) {
+      pub.scores.push({ seat: p, score: 0, summary: room.seats[p]?.socket ? 'ran out of time' : 'not here' });
+    }
+  }
+  if (pub.participants.every((p) => pub.scores.some((s) => s.seat === p))) {
+    finishFun(room, raceWinners(pub.scores));
+  } else {
+    sendFun(room);
+  }
+}
+
+function funMove(room: Room, seat: number, move: BaghMove | null): void {
+  const fun = room.fun;
+  const pub = fun?.pub;
+  if (!fun || !pub || pub.stage !== 'play' || !pub.bagh || !pub.sides) return;
+  const side = pub.bagh.turn;
+  if (pub.sides[side] !== seat) return; // not your move
+  playBagh(room, move);
+}
+
+/** Apply a Bagh-Chal move (the computer's, when `move` is null) and check for a winner. */
+function playBagh(room: Room, move: BaghMove | null): void {
+  const fun = room.fun!;
+  const pub = fun.pub;
+  const before = pub.bagh!;
+  // Moves arrive as JSON: insist on numbers, since legality is checked by strict equality.
+  const chosen = move
+    ? { from: move.from === null || move.from === undefined ? null : Number(move.from), to: Number(move.to) }
+    : aiMove(before, fun.rnd);
+  if (!chosen) return;
+  const after = applyBagh(before, chosen);
+  if (after === before) return; // illegal
+  pub.bagh = after;
+  fun.deadline = Date.now() + FUN_MOVE_MS;
+  if (after.winner) {
+    const winners = after.winner === 'T' ? [pub.sides!.T] : after.winner === 'G' ? [pub.sides!.G] : [];
+    const note = after.winner === 'T'
+      ? after.captured >= 5 ? 'The tigers caught five goats.' : 'The goats were left with nowhere to go.'
+      : after.winner === 'G' ? 'The goats hemmed in every tiger.' : 'Nobody could break through — a draw.';
+    finishFun(room, winners, note);
+    return;
+  }
+  sendFun(room);
+}
+
+function funInput(room: Room, seat: number, n: unknown): void {
+  const fun = room.fun;
+  if (!fun || !fun.tug || !fun.pub.tug || fun.pub.stage !== 'play') return;
+  const side = fun.pub.tug.pullers.indexOf(seat);
+  if (side < 0 || Date.now() < fun.tugAt) return; // not a puller, or still counting down
+  fun.taps[side] += Math.max(0, Math.min(8, Math.floor(Number(n) || 0)));
+}
+
+function funCancel(room: Room, seat: number): void {
+  const fun = room.fun;
+  if (!fun) return;
+  const pub = fun.pub;
+  if (pub.stage === 'ready' && seat === pub.host) {
+    finishFun(room, [], `${room.seats[seat]?.name ?? 'The host'} called it off.`);
+  } else if (pub.stage === 'play' && pub.sides && (pub.sides.T === seat || pub.sides.G === seat)) {
+    // Resigning a Bagh-Chal game hands it to the other side.
+    const other = pub.sides.T === seat ? pub.sides.G : pub.sides.T;
+    finishFun(room, [other], `${room.seats[seat]?.name ?? 'A player'} resigned.`);
+  }
+}
+
+/** Timers: join deadlines, late scores, idle Bagh-Chal players, and the live tug-of-war rope. */
+function funTick(room: Room): void {
+  const fun = room.fun;
+  if (!fun) return;
+  const now = Date.now();
+  const pub = fun.pub;
+  if (pub.stage === 'ready') {
+    if (now > fun.deadline || pub.participants.some((p) => !room.seats[p]?.socket)) checkReady(room);
+    return;
+  }
+  const kind = funGame(pub.game)?.kind;
+  if (kind === 'race') {
+    if (now > fun.deadline || pub.participants.some((p) => !room.seats[p]?.socket)) checkRace(room);
+  } else if (kind === 'baghchal') {
+    const toMove = pub.sides![pub.bagh!.turn];
+    const away = !room.seats[toMove]?.socket;
+    if (now > fun.deadline || (away && now > fun.deadline - FUN_MOVE_MS + FUN_AWAY_MOVE_MS)) playBagh(room, null);
+  } else if (kind === 'tug' && fun.tug && pub.tug) {
+    if (now < fun.tugAt) {
+      pub.tug.t = (now - fun.tugAt) / 1000;
+      sendFun(room);
+      return;
+    }
+    const dt = Math.min(0.25, (now - Math.max(fun.tugAt, now - 250)) / 1000) || 0.1;
+    // Nobody honestly taps faster than this.
+    const cap = Math.ceil(TUG_MAX_TAPS_PER_SECOND * dt) + 1;
+    const [l, r] = fun.taps.map((n) => Math.min(n, cap));
+    fun.taps = [0, 0];
+    fun.tug = pullTug(fun.tug, l, r, dt);
+    fun.tugAt = now;
+    pub.tug.pos = fun.tug.pos;
+    pub.tug.t = fun.tug.t;
+    if (fun.tug.winner !== null) {
+      const [left, right] = pub.tug.pullers;
+      const w = fun.tug.winner;
+      const name = (p: number): string => room.seats[p]?.name ?? '?';
+      finishFun(room, w === 0 ? [left] : w === 1 ? [right] : [], w === 'draw' ? 'Dead level when the whistle blew!' : `${name(w === 0 ? left : right)} dragged the rope over the line.`);
+    } else {
+      sendFun(room);
+    }
+  }
+}
+
+setInterval(() => {
+  for (const room of rooms.values()) if (room.fun) funTick(room);
+}, 100);
+
 // --- the away-player autopilot --------------------------------------------------
 
 setInterval(() => {
@@ -227,6 +506,7 @@ setInterval(() => {
       checkMinigame(room);
       continue;
     }
+    if (room.fun) continue; // the journey waits while the Chautari plays
     const state = room.state;
     if (!state || state.phase === 'game-over') continue;
     const seat = room.seats[current(state).id];
@@ -255,9 +535,11 @@ function onMessage(socket: WebSocket, ctx: Ctx, msg: ClientMessage): void {
         minigame: null,
         emptySince: null,
         botAt: 0,
+        fun: null,
+        funCount: 0,
       };
       rooms.set(room.code, room);
-      const seat: Seat = { seat: 0, name: cleanName(msg.name, TRAVELERS[0].name), token: randomBytes(12).toString('hex'), socket, awaySince: null };
+      const seat: Seat = { seat: 0, name: cleanName(msg.name, TRAVELERS[0].name), ...freshLook(room, 0), token: randomBytes(12).toString('hex'), socket, awaySince: null };
       room.seats.push(seat);
       ctx.room = room;
       ctx.me = seat;
@@ -272,7 +554,7 @@ function onMessage(socket: WebSocket, ctx: Ctx, msg: ClientMessage): void {
       if (room.state) return send(socket, { t: 'error', message: 'That game has already started.' });
       if (room.seats.length >= TRAVELERS.length) return send(socket, { t: 'error', message: 'That room is full (4 travelers).' });
       const index = room.seats.length;
-      const seat: Seat = { seat: index, name: cleanName(msg.name, TRAVELERS[index].name), token: randomBytes(12).toString('hex'), socket, awaySince: null };
+      const seat: Seat = { seat: index, name: cleanName(msg.name, TRAVELERS[index].name), ...freshLook(room, index), token: randomBytes(12).toString('hex'), socket, awaySince: null };
       room.seats.push(seat);
       ctx.room = room;
       ctx.me = seat;
@@ -298,7 +580,24 @@ function onMessage(socket: WebSocket, ctx: Ctx, msg: ClientMessage): void {
           send(socket, { t: 'mg-begin', participants: room.minigame.participants, seq: room.seq });
           checkMinigame(room);
         }
+        send(socket, { t: 'fun', fun: room.fun ? room.fun.pub : null });
       }
+      return;
+    }
+
+    case 'look': {
+      const room = ctx.room;
+      const me = ctx.me;
+      if (!room || !me || room.state) return;
+      const color = String(msg.color ?? '');
+      const hat = String(msg.hat ?? '') as HatStyle;
+      if (!(TRAVELER_COLORS as readonly string[]).includes(color) || !HAT_STYLES.includes(hat)) return;
+      if (room.seats.some((s) => s !== me && s.color === color)) {
+        return send(socket, { t: 'error', message: 'Someone else is wearing that colour.' });
+      }
+      me.color = color;
+      me.hat = hat;
+      sendLobby(room);
       return;
     }
 
@@ -309,7 +608,7 @@ function onMessage(socket: WebSocket, ctx: Ctx, msg: ClientMessage): void {
       const state = newGame({ playerCount: room.seats.length, boardFile: BOARD, deckFiles: DECKS });
       room.state = {
         ...state,
-        players: state.players.map((p, i) => ({ ...p, name: room.seats[i].name })),
+        players: state.players.map((p, i) => ({ ...p, name: room.seats[i].name, color: room.seats[i].color, hat: room.seats[i].hat })),
       };
       room.seq = 0;
       sendLobby(room);
@@ -324,6 +623,36 @@ function onMessage(socket: WebSocket, ctx: Ctx, msg: ClientMessage): void {
 
     case 'mg-score': {
       if (ctx.room) postScore(ctx.room, mySeat, msg.score, msg.summary);
+      return;
+    }
+
+    case 'fun-open': {
+      if (ctx.room && ctx.me) openFun(ctx.room, mySeat, msg.game, msg.participants);
+      return;
+    }
+
+    case 'fun-ready': {
+      if (ctx.room) funReady(ctx.room, mySeat, Boolean(msg.join));
+      return;
+    }
+
+    case 'fun-score': {
+      if (ctx.room) funScore(ctx.room, mySeat, msg.score, msg.summary);
+      return;
+    }
+
+    case 'fun-move': {
+      if (ctx.room && msg.move && typeof msg.move === 'object') funMove(ctx.room, mySeat, msg.move);
+      return;
+    }
+
+    case 'fun-input': {
+      if (ctx.room) funInput(ctx.room, mySeat, msg.n);
+      return;
+    }
+
+    case 'fun-cancel': {
+      if (ctx.room) funCancel(ctx.room, mySeat);
       return;
     }
 
@@ -426,6 +755,7 @@ wss.on('connection', (socket) => {
       }
       sendLobby(room);
       if (room.minigame) checkMinigame(room);
+      if (room.fun) funTick(room);
     }
   });
 });

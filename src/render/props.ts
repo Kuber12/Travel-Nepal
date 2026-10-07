@@ -128,7 +128,7 @@ function eyesTexture(): THREE.Texture {
 }
 
 /** A flared pagoda roof: a four-sided cone whose eaves kick up at the corners. */
-function pagodaRoof(width: number, height: number, color: number): THREE.Mesh {
+export function pagodaRoof(width: number, height: number, color: number): THREE.Mesh {
   const geo = new THREE.ConeGeometry(width, height, 4, 3, true);
   const pos = geo.attributes.position as THREE.BufferAttribute;
   for (let i = 0; i < pos.count; i++) {
@@ -546,8 +546,8 @@ export function airport(): THREE.Group {
   );
   beacon.position.set(-1.0, 2.72, 0.9);
 
-  const plane = jet(0.8);
-  plane.position.set(0.8, 0.28, -0.4);
+  const plane = turboprop(0.8, { gear: true });
+  plane.position.set(0.8, 0.32, -0.4);
   plane.rotation.y = 0.25;
 
   group.add(terminal, termRoof, glass, tower, cab, beacon, plane);
@@ -558,120 +558,175 @@ export function airport(): THREE.Group {
   return group;
 }
 
-/** A small airliner, nose along +x. */
-export function jet(scale = 1): THREE.Group {
-  const plane = new THREE.Group();
-  const white = mat(0xf6f6f6, 0.35, 0.1);
-  const fuselage = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 2.0, 4, 12), white);
-  fuselage.rotation.z = Math.PI / 2;
-  const wing = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.05, 2.6), white);
-  wing.position.x = 0.1;
-  const stab = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.04, 0.9), white);
-  stab.position.x = -1.05;
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.6, 0.05), mat(0xc8102e, 0.5));
-  tail.position.set(-1.0, 0.32, 0);
-  const stripe = new THREE.Mesh(new THREE.CapsuleGeometry(0.225, 1.6, 4, 12), mat(0x2b5fa8, 0.4));
-  stripe.rotation.z = Math.PI / 2;
-  stripe.scale.set(1, 1, 0.3);
-  stripe.position.y = -0.06;
-  for (const z of [-0.6, 0.6]) {
-    const engine = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 10), mat(0xbfc4ca, 0.3, 0.6));
-    engine.rotation.z = Math.PI / 2;
-    engine.position.set(0.25, -0.12, z);
-    plane.add(engine);
+let liveryTex: THREE.Texture | null = null;
+/**
+ * The fuselage's paint, laid out for a lathe body: across is round the body
+ * (0.25 belly, 0.75 roof, 0 and 0.5 the flanks), down is tail to nose.
+ */
+function livery(): THREE.Texture {
+  if (liveryTex) return liveryTex;
+  const W = 512;
+  const H = 256;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#f7f7f4';
+  g.fillRect(0, 0, W, H);
+  // A blue belly and cheatlines, a gold pinstripe.
+  g.fillStyle = '#1f4f9a';
+  g.fillRect(W * 0.12, 0, W * 0.26, H);
+  for (const u of [0.04, 0.42]) {
+    g.fillRect(W * u, 0, W * 0.04, H);
   }
-  plane.add(fuselage, stripe, wing, stab, tail);
+  g.fillStyle = '#e2b23a';
+  for (const u of [0.095, 0.39]) g.fillRect(W * u, 0, W * 0.012, H);
+  // Cabin windows along both flanks, just above the cheatline.
+  g.fillStyle = '#2a3442';
+  for (const u of [0.955, 0.535]) {
+    for (let v = 0.24; v < 0.74; v += 0.034) {
+      g.beginPath();
+      g.roundRect(W * u - 4, H * (1 - v) - 4, 8, 9, 3);
+      g.fill();
+    }
+  }
+  // The cockpit glazing, wrapped over the nose.
+  g.fillRect(W * 0.6, H * 0.06, W * 0.3, H * 0.045);
+  liveryTex = new THREE.CanvasTexture(c);
+  liveryTex.colorSpace = THREE.SRGBColorSpace;
+  liveryTex.anisotropy = 8;
+  return liveryTex;
+}
+
+let emblemTex: THREE.Texture | null = null;
+/** The tail emblem: a snowy peak in a gold sun. */
+function emblem(): THREE.Texture {
+  if (emblemTex) return emblemTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#e2b23a';
+  g.beginPath();
+  g.arc(64, 60, 40, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = '#ffffff';
+  g.beginPath();
+  g.moveTo(18, 100);
+  g.lineTo(52, 40);
+  g.lineTo(66, 62);
+  g.lineTo(80, 46);
+  g.lineTo(112, 100);
+  g.closePath();
+  g.fill();
+  emblemTex = new THREE.CanvasTexture(c);
+  emblemTex.colorSpace = THREE.SRGBColorSpace;
+  return emblemTex;
+}
+
+/**
+ * A high-wing twin turboprop — the plane of Nepal's domestic routes and the
+ * dawn mountain flights — nose along +x. `spin` gives it turning propellers
+ * (their groups are on `userData.props`); `gear` lowers the wheels for the apron.
+ */
+export function turboprop(scale = 1, opts: { spin?: boolean; gear?: boolean } = {}): THREE.Group {
+  const plane = new THREE.Group();
+  const white = mat(0xf4f4f1, 0.35, 0.1);
+  const blue = mat(0x1f4f9a, 0.4, 0.1);
+  const grey = mat(0x9aa0a8, 0.35, 0.6);
+  const dark = mat(0x2a2e34, 0.5);
+
+  const body = new THREE.LatheGeometry(
+    [[-1.15, 0], [-1.12, 0.06], [-0.9, 0.12], [-0.6, 0.19], [-0.3, 0.22], [0.6, 0.22], [0.85, 0.19], [0.98, 0.13], [1.04, 0.06], [1.06, 0]].map(
+      ([x, r]) => new THREE.Vector2(r, x),
+    ),
+    32,
+  );
+  body.rotateZ(-Math.PI / 2);
+  body.scale(1, 1.05, 1);
+  const fuselage = new THREE.Mesh(body, new THREE.MeshStandardMaterial({ map: livery(), roughness: 0.35, metalness: 0.1 }));
+  plane.add(fuselage);
+
+  // The high wing: a tapered slab across the roof.
+  const planform = new THREE.Shape();
+  planform.moveTo(0.3, 0);
+  planform.lineTo(0.22, 1.5);
+  planform.lineTo(-0.04, 1.5);
+  planform.lineTo(-0.14, 0);
+  planform.lineTo(-0.04, -1.5);
+  planform.lineTo(0.22, -1.5);
+  planform.closePath();
+  const wingGeo = new THREE.ExtrudeGeometry(planform, { depth: 0.045, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 1 });
+  wingGeo.rotateX(Math.PI / 2);
+  const wing = new THREE.Mesh(wingGeo, white);
+  wing.position.y = 0.255;
+  plane.add(wing);
+
+  // Two engines under the wing, each with a six-bladed propeller.
+  const props: THREE.Group[] = [];
+  for (const z of [-0.62, 0.62]) {
+    const nacelle = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.42, 6, 14), white);
+    nacelle.rotation.z = Math.PI / 2;
+    nacelle.position.set(0.18, 0.16, z);
+    const spinner = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.14, 14), grey);
+    spinner.rotation.z = -Math.PI / 2;
+    spinner.position.set(0.5, 0.16, z);
+    const prop = new THREE.Group();
+    prop.position.set(0.48, 0.16, z);
+    for (let k = 0; k < 6; k++) {
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.27, 0.05), dark);
+      blade.geometry.translate(0, 0.135, 0);
+      blade.rotation.x = (k / 6) * Math.PI * 2;
+      blade.rotation.y = 0.35;
+      prop.add(blade);
+    }
+    if (opts.spin) {
+      const blur = new THREE.Mesh(
+        new THREE.CircleGeometry(0.28, 28),
+        new THREE.MeshBasicMaterial({ color: 0x4a4e54, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }),
+      );
+      blur.rotation.y = Math.PI / 2;
+      prop.add(blur);
+    }
+    props.push(prop);
+    plane.add(nacelle, spinner, prop);
+  }
+
+  // The T-tail: a swept blue fin with the emblem, the tailplane on top.
+  const finShape = new THREE.Shape();
+  finShape.moveTo(-1.12, 0.08);
+  finShape.lineTo(-0.72, 0.08);
+  finShape.lineTo(-0.94, 0.66);
+  finShape.lineTo(-1.12, 0.66);
+  finShape.closePath();
+  const finGeo = new THREE.ExtrudeGeometry(finShape, { depth: 0.04, bevelEnabled: false });
+  finGeo.translate(0, 0, -0.02);
+  plane.add(new THREE.Mesh(finGeo, blue));
+  for (const s of [-1, 1]) {
+    const badge = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), new THREE.MeshStandardMaterial({ map: emblem(), transparent: true, roughness: 0.5 }));
+    badge.position.set(-0.95, 0.42, s * 0.022);
+    if (s < 0) badge.rotation.y = Math.PI;
+    plane.add(badge);
+  }
+  const tailplane = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.03, 0.95), white);
+  tailplane.position.set(-1.0, 0.66, 0);
+  plane.add(tailplane);
+
+  if (opts.gear) {
+    const wheel = (x: number, z: number, r: number): void => {
+      const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.16, 6), grey);
+      strut.position.set(x, -0.26, z);
+      const tyre = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.05, 14), dark);
+      tyre.rotation.x = Math.PI / 2;
+      tyre.position.set(x, -0.34 + (0.06 - r), z);
+      plane.add(strut, tyre);
+    };
+    wheel(0.78, 0, 0.045);
+    wheel(-0.05, -0.2, 0.06);
+    wheel(-0.05, 0.2, 0.06);
+  }
+  plane.userData.props = props;
   plane.scale.setScalar(scale);
   return shadowed(plane, false);
-}
-
-// --- animals -----------------------------------------------------------------
-
-/** The one-horned rhino, in blocks. Breathes and swings its head. */
-export function rhino(): THREE.Group {
-  const group = new THREE.Group();
-  const hide = mat(0x8c8f93, 0.95);
-
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.95, 4, 10), hide);
-  body.rotation.z = Math.PI / 2;
-  body.position.y = 0.7;
-
-  const headPivot = new THREE.Group();
-  headPivot.position.set(0.7, 0.7, 0);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.42, 0.45), hide);
-  head.position.set(0.28, -0.08, 0);
-  const horn = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.34, 7), mat(0xd8d2c4, 0.5));
-  horn.position.set(0.58, 0.2, 0);
-  horn.rotation.z = -0.3;
-  for (const z of [-0.14, 0.14]) {
-    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 5), hide);
-    ear.position.set(0.0, 0.2, z);
-    headPivot.add(ear);
-  }
-  headPivot.add(head, horn);
-
-  group.add(body, headPivot);
-  for (const x of [-0.5, 0.45]) {
-    for (const z of [-0.26, 0.26]) {
-      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.62, 7), hide);
-      leg.position.set(x, 0.31, z);
-      group.add(leg);
-    }
-  }
-  group.userData.tick = ((_dt: number, t: number) => {
-    headPivot.rotation.y = Math.sin(t * 0.7) * 0.25;
-    headPivot.rotation.z = Math.sin(t * 1.3) * 0.06 - 0.08;
-    body.scale.y = 1 + Math.sin(t * 2) * 0.02;
-  }) satisfies Tick;
-  return shadowed(group);
-}
-
-/** An Asian elephant for the Western Terai. Swings its trunk and flaps its ears. */
-export function elephant(): THREE.Group {
-  const group = new THREE.Group();
-  const hide = mat(0x7d7b7a, 0.95);
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 0.8, 4, 10), hide);
-  body.rotation.z = Math.PI / 2;
-  body.position.y = 0.95;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 10), hide);
-  head.position.set(0.9, 1.15, 0);
-
-  const trunkPivot = new THREE.Group();
-  trunkPivot.position.set(1.18, 1.05, 0);
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.12, 0.8, 8), hide);
-  trunk.position.y = -0.4;
-  trunkPivot.add(trunk);
-
-  const ears: THREE.Mesh[] = [];
-  for (const z of [-1, 1]) {
-    const ear = new THREE.Mesh(new THREE.CircleGeometry(0.3, 10), hide);
-    ear.material = mat(0x6f6d6c, 0.95);
-    (ear.material as THREE.Material).side = THREE.DoubleSide;
-    ear.position.set(0.78, 1.18, z * 0.36);
-    ears.push(ear);
-    group.add(ear);
-  }
-
-  // A rider's saddle cloth, red and gold.
-  const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.05, 1.12), mat(0xb2283a, 0.7));
-  cloth.position.set(0, 1.47, 0);
-  const trim = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.03, 1.14), GOLD());
-  trim.position.set(0, 1.43, 0);
-
-  group.add(body, head, trunkPivot, cloth, trim);
-  for (const x of [-0.45, 0.45]) {
-    for (const z of [-0.25, 0.25]) {
-      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.6, 8), hide);
-      leg.position.set(x, 0.3, z);
-      group.add(leg);
-    }
-  }
-  group.userData.tick = ((_dt: number, t: number) => {
-    trunkPivot.rotation.z = Math.sin(t * 1.1) * 0.35 + 0.15;
-    ears[0].rotation.y = Math.sin(t * 2.3) * 0.35 - 0.2;
-    ears[1].rotation.y = -Math.sin(t * 2.3) * 0.35 + 0.2;
-  }) satisfies Tick;
-  return shadowed(group);
 }
 
 /** A painted doonga — the wooden rowing boats of Phewa Lake. Bobs on the water. */

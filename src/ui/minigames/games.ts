@@ -873,4 +873,496 @@ const quiz: MiniGame = {
   },
 };
 
-export const GAMES: Record<string, MiniGame> = { gate, climb, catch: catchGame, snapshot, flags, match, quiz };
+// --- stack: Momo Tower --------------------------------------------------------------------------
+
+/** A steamed momo: a plump dumpling with its pleated, pinched top. */
+function drawMomo(g: CanvasRenderingContext2D, x: number, y: number, w: number, tilt = 0): void {
+  const h = w * 0.62;
+  g.save();
+  g.translate(x, y);
+  g.rotate(tilt);
+  const body = g.createRadialGradient(-w * 0.15, -h * 0.2, w * 0.05, 0, 0, w * 0.6);
+  body.addColorStop(0, '#fffaf0');
+  body.addColorStop(0.7, '#f3e6c8');
+  body.addColorStop(1, '#d9c39a');
+  g.fillStyle = body;
+  g.beginPath();
+  g.moveTo(-w / 2, h * 0.32);
+  g.bezierCurveTo(-w / 2, -h * 0.25, -w * 0.18, -h * 0.55, 0, -h * 0.62);
+  g.bezierCurveTo(w * 0.18, -h * 0.55, w / 2, -h * 0.25, w / 2, h * 0.32);
+  g.quadraticCurveTo(0, h * 0.5, -w / 2, h * 0.32);
+  g.fill();
+  // Pleats gathering to the pinched top.
+  g.strokeStyle = 'rgba(160, 130, 85, 0.6)';
+  g.lineWidth = 1.6;
+  for (let i = -3; i <= 3; i++) {
+    g.beginPath();
+    g.moveTo(i * w * 0.11, h * 0.18);
+    g.quadraticCurveTo(i * w * 0.07, -h * 0.2, 0, -h * 0.58);
+    g.stroke();
+  }
+  g.fillStyle = '#e8d6b0';
+  g.beginPath();
+  g.ellipse(0, -h * 0.6, w * 0.07, h * 0.08, 0, 0, Math.PI * 2);
+  g.fill();
+  g.restore();
+}
+
+const stack: MiniGame = {
+  id: 'stack',
+  title: 'Momo Tower',
+  icon: '🥟',
+  how: 'A momo glides back and forth above the steamer. Press Space or click to drop it onto the tower. Land it on the one below — a dead-centre drop is a Perfect! Miss and the tower topples.',
+  unit: 'momos',
+  target: (d) => GAME_TARGETS.stack[d],
+  async play(host, ctx) {
+    const W = 520;
+    const H = 360;
+    const { c, g } = canvas(host, W, H);
+    const hud = hudBar(host, 'momos');
+    const hint = el('div', 'mg-hint', 'Space / click to drop');
+    host.append(hint);
+    const rnd = seeded(ctx.seed);
+
+    const MW = 78; // momo width
+    const MH = 30; // height each momo adds to the tower
+    const BASE_Y = H - 62;
+    const tower: number[] = [W / 2];
+    let perfects = 0;
+    let fallen: { x: number; y: number; vy: number; vx: number; r: number } | null = null;
+    let scroll = 0;
+    let steam = 0;
+
+    const topY = (n: number): number => BASE_Y - n * MH + scroll;
+    const draw = (hoverX: number | null, dropY: number | null, t: number): void => {
+      const bg = g.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, '#fbe9c8');
+      bg.addColorStop(1, '#efc98a');
+      g.fillStyle = bg;
+      g.fillRect(0, 0, W, H);
+      // A kitchen window and a string of chillies.
+      g.fillStyle = 'rgba(255, 255, 255, 0.35)';
+      g.fillRect(36, 30, 110, 80);
+      g.strokeStyle = 'rgba(120, 80, 40, 0.35)';
+      g.lineWidth = 4;
+      g.strokeRect(36, 30, 110, 80);
+      for (let i = 0; i < 6; i++) {
+        g.fillStyle = '#c8342f';
+        g.beginPath();
+        g.ellipse(W - 60, 30 + i * 16, 4, 9, 0.3, 0, Math.PI * 2);
+        g.fill();
+      }
+      // The counter and the bamboo steamer.
+      g.fillStyle = '#8a5a32';
+      g.fillRect(0, H - 34 + Math.min(scroll, 200), W, 40);
+      const sy = BASE_Y + 24 + scroll;
+      g.fillStyle = '#d9b26a';
+      g.beginPath();
+      g.ellipse(W / 2, sy, 110, 20, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#c4974a';
+      g.fillRect(W / 2 - 110, sy, 220, 22);
+      g.beginPath();
+      g.ellipse(W / 2, sy + 22, 110, 20, 0, 0, Math.PI);
+      g.fill();
+      g.strokeStyle = 'rgba(110, 70, 30, 0.5)';
+      g.lineWidth = 2;
+      for (let k = 0; k < 3; k++) {
+        g.beginPath();
+        g.moveTo(W / 2 - 110, sy + 5 + k * 7);
+        g.lineTo(W / 2 + 110, sy + 5 + k * 7);
+        g.stroke();
+      }
+      // The tower, swaying a little more the less straight it is.
+      const lean = (tower[tower.length - 1] - tower[0]) / 600;
+      tower.forEach((x, i) => {
+        if (i === 0) return;
+        const sway = Math.sin(t * 2.2) * i * 0.6 * (0.3 + Math.abs(lean));
+        drawMomo(g, x + sway, topY(i), MW, lean * 0.4);
+      });
+      // Steam curling up.
+      steam += 0.016;
+      g.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+      g.lineWidth = 3;
+      for (let k = 0; k < 3; k++) {
+        const x0 = W / 2 - 40 + k * 40;
+        g.beginPath();
+        for (let y = 0; y < 60; y += 4) {
+          const yy = topY(tower.length - 1) - 30 - y - ((steam * 40 + k * 20) % 30);
+          g.lineTo(x0 + Math.sin(y * 0.12 + steam * 3 + k) * 6, yy);
+        }
+        g.stroke();
+      }
+      if (hoverX !== null) drawMomo(g, hoverX, dropY ?? topY(tower.length) - 70, MW);
+      if (fallen) drawMomo(g, fallen.x, fallen.y, MW, fallen.r);
+      g.fillStyle = 'rgba(90, 50, 20, 0.75)';
+      g.font = 'bold 16px Georgia, serif';
+      g.textAlign = 'left';
+      g.fillText(`Tower: ${tower.length - 1}`, 18, H - 12);
+    };
+
+    draw(W / 2, null, 0);
+    await countdown(host);
+    let pressed = false;
+    const press = (e: Event): void => {
+      if (e instanceof KeyboardEvent && e.code !== 'Space') return;
+      e.preventDefault();
+      pressed = true;
+    };
+    window.addEventListener('keydown', press);
+    c.addEventListener('pointerdown', press);
+
+    const DURATION = 30;
+    let clock = 0;
+    let alive = true;
+    let phase = rnd() * Math.PI * 2;
+    while (alive && clock < DURATION) {
+      const level = tower.length - 1;
+      const speed = 1.7 + level * 0.17 + ctx.difficulty * 0.25;
+      let x = W / 2;
+      pressed = false;
+      await loop((dt) => {
+        clock += dt;
+        phase += dt * speed;
+        x = W / 2 + Math.sin(phase) * 150;
+        hud.setTime(1 - clock / DURATION);
+        draw(x, null, clock);
+        return !pressed && clock < DURATION;
+      });
+      if (!pressed) break;
+      // Drop it.
+      const fromY = topY(tower.length) - 70;
+      const toY = topY(tower.length);
+      await loop((dt, t) => {
+        clock += dt;
+        const k = Math.min(1, t / 0.18);
+        draw(x, fromY + (toY - fromY) * k * k, clock);
+        return k < 1;
+      });
+      const below = tower[tower.length - 1];
+      const off = Math.abs(x - below);
+      // Generous at the base, tighter as the tower climbs.
+      const tolerance = Math.max(MW * 0.32, MW * 0.66 - level * 1.4 - ctx.difficulty * 4);
+      if (off <= 6) {
+        tower.push(below);
+        perfects++;
+        flash(host, 'Perfect!', true);
+      } else if (off <= tolerance) {
+        tower.push(x);
+        flash(host, '+1', true);
+      } else {
+        alive = false;
+        fallen = { x, y: toY, vy: -80, vx: x > below ? 160 : -160, r: 0 };
+        flash(host, 'Toppled!', false);
+        await loop((dt) => {
+          fallen!.vy += 900 * dt;
+          fallen!.y += fallen!.vy * dt;
+          fallen!.x += fallen!.vx * dt;
+          fallen!.r += (fallen!.vx > 0 ? 6 : -6) * dt;
+          draw(null, null, clock);
+          return fallen!.y < H + 60;
+        });
+      }
+      hud.setScore(tower.length - 1);
+      // Keep the top of the tower in view.
+      const want = Math.max(0, (tower.length - 6) * MH);
+      if (want > scroll) {
+        const from = scroll;
+        await loop((_dt, t) => {
+          const k = Math.min(1, t / 0.25);
+          scroll = from + (want - from) * k;
+          draw(null, null, clock);
+          return k < 1;
+        });
+      }
+    }
+    window.removeEventListener('keydown', press);
+    c.removeEventListener('pointerdown', press);
+    hint.remove();
+    const score = tower.length - 1;
+    return { score, summary: `${score} momos high${perfects ? `, ${perfects} perfect` : ''}` };
+  },
+};
+
+// --- swing: Dashain Ping -------------------------------------------------------------------------
+
+const swing: MiniGame = {
+  id: 'swing',
+  title: 'Dashain Ping',
+  icon: '🎋',
+  how: 'Pump the bamboo swing! Press Space or click each time the swing passes through the glowing zone at the bottom of its arc. Pump at the wrong moment and you lose height. Twelve seconds — the highest swing counts.',
+  unit: '% high',
+  target: (d) => GAME_TARGETS.swing[d],
+  async play(host, ctx) {
+    const W = 520;
+    const H = 360;
+    const { c, g } = canvas(host, W, H);
+    const hud = hudBar(host, '% high');
+    const hint = el('div', 'mg-hint', 'Space / click as the swing passes the bottom');
+    host.append(hint);
+    const rnd = seeded(ctx.seed);
+
+    const PX = W / 2;
+    const PY = 46;
+    const L = 236;
+    const A_MAX = 1.45;
+    const zone = [0.45, 0.38, 0.3][ctx.difficulty];
+    const omega = Math.PI; // a two-second swing
+    let A = 0.2;
+    let best = 0;
+    let p = 0;
+    let usedPass = -1;
+    const kites = Array.from({ length: 4 }, () => ({ x: rnd() * W, y: 30 + rnd() * 120, s: 0.6 + rnd() * 0.6, c: ['#c8342f', '#2b5fb8', '#f2c230', '#2f9a4a'][Math.floor(rnd() * 4)] }));
+    const heightOf = (a: number): number => Math.round(((1 - Math.cos(a)) / (1 - Math.cos(A_MAX))) * 100);
+
+    const draw = (t: number, glow: number): void => {
+      const sky = g.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0, '#f7a35c');
+      sky.addColorStop(0.55, '#fbd6a0');
+      sky.addColorStop(1, '#f6ead4');
+      g.fillStyle = sky;
+      g.fillRect(0, 0, W, H);
+      // Dashain kites on the evening wind.
+      for (const k of kites) {
+        const kx = (k.x + t * 12 * k.s) % (W + 40) - 20;
+        const ky = k.y + Math.sin(t * 1.3 + k.x) * 6;
+        g.save();
+        g.translate(kx, ky);
+        g.rotate(Math.sin(t + k.y) * 0.2);
+        g.fillStyle = k.c;
+        g.beginPath();
+        g.moveTo(0, -12 * k.s);
+        g.lineTo(9 * k.s, 0);
+        g.lineTo(0, 12 * k.s);
+        g.lineTo(-9 * k.s, 0);
+        g.fill();
+        g.strokeStyle = 'rgba(60, 40, 20, 0.35)';
+        g.lineWidth = 1;
+        g.beginPath();
+        g.moveTo(0, 12 * k.s);
+        g.lineTo(-8, 40);
+        g.stroke();
+        g.restore();
+      }
+      // Hills and the fairground.
+      g.fillStyle = '#7fa64a';
+      g.beginPath();
+      g.moveTo(0, H - 40);
+      for (let x = 0; x <= W; x += 20) g.lineTo(x, H - 50 - Math.sin(x * 0.02) * 16);
+      g.lineTo(W, H);
+      g.lineTo(0, H);
+      g.fill();
+      // The pump zone, glowing at the bottom of the arc.
+      g.strokeStyle = `rgba(242, 194, 48, ${0.35 + glow * 0.5})`;
+      g.lineWidth = 16;
+      g.beginPath();
+      g.arc(PX, PY, L + 12, Math.PI / 2 - zone * 0.6, Math.PI / 2 + zone * 0.6);
+      g.stroke();
+      // Bamboo poles, lashed at the top, with marigold garlands.
+      g.strokeStyle = '#a4864a';
+      g.lineWidth = 9;
+      g.lineCap = 'round';
+      for (const [x0, x1] of [[60, PX - 6], [W - 60, PX + 6]]) {
+        g.beginPath();
+        g.moveTo(x0, H - 30);
+        g.lineTo(x1, PY - 10);
+        g.stroke();
+      }
+      g.strokeStyle = 'rgba(80, 60, 30, 0.35)';
+      g.lineWidth = 2;
+      for (let k = 1; k < 8; k++) {
+        for (const [x0, x1] of [[60, PX - 6], [W - 60, PX + 6]]) {
+          const y = H - 30 - ((H - 30 - PY) * k) / 8;
+          const x = x0 + ((x1 - x0) * k) / 8;
+          g.beginPath();
+          g.moveTo(x - 5, y);
+          g.lineTo(x + 5, y);
+          g.stroke();
+        }
+      }
+      for (let k = 0; k < 9; k++) {
+        g.fillStyle = k % 2 ? '#f29a1e' : '#f2c230';
+        g.beginPath();
+        g.arc(PX - 40 + k * 10, PY - 2 + Math.sin(k / 8 * Math.PI) * 10, 5, 0, Math.PI * 2);
+        g.fill();
+      }
+      // The swing.
+      const th = A * Math.sin(p);
+      const sx = PX + Math.sin(th) * L;
+      const sy = PY + Math.cos(th) * L;
+      g.strokeStyle = '#6b4a2f';
+      g.lineWidth = 3;
+      g.beginPath();
+      g.moveTo(PX - 4, PY);
+      g.lineTo(sx - 18 * Math.cos(th), sy + 18 * Math.sin(th));
+      g.moveTo(PX + 4, PY);
+      g.lineTo(sx + 18 * Math.cos(th), sy - 18 * Math.sin(th));
+      g.stroke();
+      g.save();
+      g.translate(sx, sy);
+      g.rotate(-th);
+      g.fillStyle = '#8a5a32';
+      g.fillRect(-24, -4, 48, 9);
+      g.font = '38px serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'bottom';
+      g.fillText('🧒', 0, -2);
+      g.restore();
+      // The height meter.
+      const h = heightOf(Math.abs(A));
+      g.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      g.fillRect(W - 34, 40, 16, 220);
+      g.fillStyle = '#c8342f';
+      g.fillRect(W - 34, 260 - (220 * h) / 100, 16, (220 * h) / 100);
+      const bh = heightOf(best);
+      g.fillStyle = '#2a1f16';
+      g.fillRect(W - 40, 260 - (220 * bh) / 100, 28, 3);
+      const target = swing.target(ctx.difficulty);
+      g.strokeStyle = '#d9a327';
+      g.setLineDash([4, 3]);
+      g.beginPath();
+      g.moveTo(W - 44, 260 - (220 * target) / 100);
+      g.lineTo(W - 12, 260 - (220 * target) / 100);
+      g.stroke();
+      g.setLineDash([]);
+    };
+
+    draw(0, 0);
+    await countdown(host);
+    let pressedAt = -1;
+    const press = (e: Event): void => {
+      if (e instanceof KeyboardEvent && (e.code !== 'Space' || e.repeat)) return;
+      e.preventDefault();
+      pressedAt = p;
+    };
+    window.addEventListener('keydown', press);
+    c.addEventListener('pointerdown', press);
+    const DURATION = 12;
+    let glow = 0;
+    await loop((dt, t) => {
+      p += omega * dt;
+      A = Math.max(0.12, A * (1 - 0.035 * dt));
+      if (pressedAt >= 0) {
+        const pass = Math.round(p / Math.PI);
+        if (pass !== usedPass) {
+          usedPass = pass;
+          if (Math.abs(Math.sin(p)) < zone) {
+            A = Math.min(A_MAX, A + (0.2 - ctx.difficulty * 0.02) * (1 - A / A_MAX) + 0.02);
+            glow = 1;
+            flash(host, 'Pump!', true);
+          } else {
+            A *= 0.86;
+            flash(host, Math.cos(p) * Math.sin(p) > 0 ? 'Too late!' : 'Too early!', false);
+          }
+        }
+        pressedAt = -1;
+      }
+      best = Math.max(best, Math.abs(A * Math.sin(p)));
+      glow = Math.max(0, glow - dt * 2.5);
+      hud.setTime(1 - t / DURATION);
+      hud.setScore(heightOf(best));
+      draw(t, glow);
+      return t < DURATION;
+    });
+    window.removeEventListener('keydown', press);
+    c.removeEventListener('pointerdown', press);
+    hint.remove();
+    const score = heightOf(best);
+    return { score, summary: `swung ${score}% of the way to the top` };
+  },
+};
+
+// --- lamps: Tihar Diyo ---------------------------------------------------------------------------
+
+const LAMP_KEYS = ['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyZ', 'KeyX', 'KeyC', 'KeyV'];
+
+const lamps: MiniGame = {
+  id: 'lamps',
+  title: 'Tihar Diyo',
+  icon: '🪔',
+  how: 'It’s Tihar, the festival of lights. Clay lamps keep flickering out — click a dark diyo (or press its key, Q W E R / A S D F / Z X C V) to relight it. Quick relights score double; knocking a lit lamp costs a point. Twenty seconds.',
+  unit: 'pts',
+  target: (d) => GAME_TARGETS.lamps[d],
+  async play(host, ctx) {
+    const rnd = seeded(ctx.seed);
+    const hud = hudBar(host, 'pts');
+    const yard = el('div', 'mg-diyos');
+    const keyNames = 'QWERASDFZXCV';
+    const state = LAMP_KEYS.map(() => ({ lit: true, outAt: 0 }));
+    const buttons = LAMP_KEYS.map((_, i) => {
+      const b = el('button', 'mg-diyo lit');
+      b.type = 'button';
+      b.setAttribute('aria-label', `Lamp ${keyNames[i]}`);
+      b.append(el('span', 'mg-diyo-flame'), el('span', 'mg-diyo-bowl'), el('span', 'mg-diyo-key', keyNames[i]));
+      yard.append(b);
+      return b;
+    });
+    host.append(yard);
+    await countdown(host);
+
+    const DURATION = 20;
+    let score = 0;
+    let relit = 0;
+    let clock = 0;
+    let next = 0.6;
+    const hit = (i: number): void => {
+      const lamp = state[i];
+      if (lamp.lit) {
+        score = Math.max(0, score - 1);
+        buttons[i].classList.add('knock');
+        setTimeout(() => buttons[i].classList.remove('knock'), 250);
+        flash(host, 'Careful!', false);
+      } else {
+        const quick = clock - lamp.outAt < 0.65;
+        score += quick ? 2 : 1;
+        relit++;
+        lamp.lit = true;
+        buttons[i].classList.add('lit');
+        buttons[i].classList.remove('smoke');
+        if (quick) flash(host, 'Quick! +2', true);
+      }
+      hud.setScore(score);
+    };
+    const clicks = buttons.map((b, i) => {
+      const h = (e: Event): void => {
+        e.preventDefault();
+        hit(i);
+      };
+      b.addEventListener('pointerdown', h);
+      return h;
+    });
+    const key = (e: KeyboardEvent): void => {
+      const i = LAMP_KEYS.indexOf(e.code);
+      if (i < 0 || e.repeat) return;
+      e.preventDefault();
+      hit(i);
+    };
+    window.addEventListener('keydown', key);
+    await loop((dt) => {
+      clock += dt;
+      next -= dt;
+      if (next <= 0) {
+        // The same flicker pattern for everyone who plays this seed.
+        const pace = Math.max(0.32, 0.78 - clock * 0.018 - ctx.difficulty * 0.08);
+        next = pace * (0.7 + rnd() * 0.6);
+        const litNow = state.map((s, i) => (s.lit ? i : -1)).filter((i) => i >= 0);
+        if (litNow.length > 0) {
+          const i = litNow[Math.floor(rnd() * litNow.length)];
+          state[i].lit = false;
+          state[i].outAt = clock;
+          buttons[i].classList.remove('lit');
+        }
+      }
+      state.forEach((s, i) => {
+        if (!s.lit && clock - s.outAt > 2.6) buttons[i].classList.add('smoke');
+      });
+      hud.setTime(1 - clock / DURATION);
+      return clock < DURATION;
+    });
+    window.removeEventListener('keydown', key);
+    buttons.forEach((b, i) => b.removeEventListener('pointerdown', clicks[i]));
+    return { score, summary: `${relit} lamps relit` };
+  },
+};
+
+export const GAMES: Record<string, MiniGame> = { gate, climb, catch: catchGame, snapshot, flags, match, quiz, stack, swing, lamps };

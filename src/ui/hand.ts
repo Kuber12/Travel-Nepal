@@ -9,6 +9,7 @@
 import { current, scoreFor } from '../engine/reducer.ts';
 import type { Card, GameState } from '../engine/types.ts';
 import { countUp, renderCard } from './cardview.ts';
+import { ticketWallet } from './tickets.ts';
 
 export type HandView = {
   render(state: GameState): void;
@@ -31,6 +32,7 @@ export function createHand(root: HTMLElement, viewerRoot: HTMLElement): HandView
   let home: number | null = null;
   let lastActive: number | null = null;
   let lastKey = '';
+  let lastCards = '';
   let latest: GameState | null = null;
   const shownScore = new Map<number, number>();
 
@@ -45,6 +47,7 @@ export function createHand(root: HTMLElement, viewerRoot: HTMLElement): HandView
   // Re-fan on resize so the spacing fits the new width.
   window.addEventListener('resize', () => {
     lastKey = '';
+    lastCards = '';
     if (latest) render(latest);
   });
 
@@ -61,7 +64,8 @@ export function createHand(root: HTMLElement, viewerRoot: HTMLElement): HandView
 
     // --- header: whose passport, and the score counter ---
     const score = scoreFor(state, player);
-    const key = `${player.id}|${player.passport.join(',')}`;
+    const key = `${player.id}|${player.passport.join(',')}|${player.tickets.join(',')}`;
+    const cardsKey = `${player.id}|${player.passport.join(',')}`;
     if (key !== lastKey) {
       header.replaceChildren();
       const who = document.createElement('div');
@@ -89,7 +93,10 @@ export function createHand(root: HTMLElement, viewerRoot: HTMLElement): HandView
       label.className = 'score-label';
       label.textContent = `pts · ${cards.length} card${cards.length === 1 ? '' : 's'}`;
       counter.append(num, label);
-      header.append(who, counter);
+      // The entry tickets in hand, beside the passport: held in colour, the rest still to get.
+      const wallet = ticketWallet(state.board, player);
+      wallet.setAttribute('aria-label', `${player.name}'s entry tickets`);
+      header.append(who, counter, wallet);
 
       const before = shownScore.get(player.id) ?? 0;
       const samePlayer = lastKey.startsWith(`${player.id}|`);
@@ -103,7 +110,8 @@ export function createHand(root: HTMLElement, viewerRoot: HTMLElement): HandView
       }
       shownScore.set(player.id, score);
 
-      buildFan(cards, player.color);
+      if (cardsKey !== lastCards) buildFan(cards, player.color);
+      lastCards = cardsKey;
       lastKey = key;
     }
   }
@@ -167,6 +175,7 @@ export function createHand(root: HTMLElement, viewerRoot: HTMLElement): HandView
     setHome(playerId) {
       home = playerId;
       lastKey = '';
+      lastCards = '';
       if (latest) render(latest);
     },
   };

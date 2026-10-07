@@ -12,11 +12,19 @@ export type Overlay = {
   render(state: GameState, busy: boolean, waiting?: string): void;
 };
 
-export function createOverlay(root: HTMLElement, dispatch: (action: Action) => void): Overlay {
+export function createOverlay(
+  root: HTMLElement,
+  dispatch: (action: Action) => void,
+  openChautari?: () => void,
+): Overlay {
   return {
     render(state, busy, waiting) {
       if (state.phase === 'game-over') {
-        root.replaceChildren(scoreboard(state));
+        // Don't rebuild the scoreboard on every render, only when it changes.
+        const key = `over|${state.players.map((p) => p.medals ?? 0).join(',')}`;
+        if (root.dataset.key === key) return;
+        root.dataset.key = key;
+        root.replaceChildren(scoreboard(state, openChautari));
         root.classList.add('open');
         return;
       }
@@ -114,7 +122,7 @@ function minigameText(state: GameState): string {
     : `${did === 'scored' ? 'Scored' : 'Rolled'} ${total}${target ? `, needed ${target}` : ''}. No points this time.`;
 }
 
-function scoreboard(state: GameState): HTMLElement {
+function scoreboard(state: GameState, openChautari?: () => void): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'scoreboard';
 
@@ -129,8 +137,10 @@ function scoreboard(state: GameState): HTMLElement {
 
   const table = document.createElement('table');
   const head = document.createElement('tr');
-  for (const label of ['Traveler', 'Cards', 'Tickets', 'Score']) {
-    head.append(tag('th', '', label));
+  for (const label of ['Traveler', 'Cards', 'Tickets', '🏅', 'Score']) {
+    const th = tag('th', '', label);
+    if (label === '🏅') th.title = 'Chautari medals — just for fun, not part of the score';
+    head.append(th);
   }
   table.append(head);
 
@@ -141,15 +151,24 @@ function scoreboard(state: GameState): HTMLElement {
       tag('td', '', player.id === state.winnerId ? `★ ${player.name}` : player.name),
       tag('td', '', String(player.passport.length)),
       tag('td', '', String(player.tickets.length)),
+      tag('td', 'medal-cell', String(player.medals ?? 0)),
       tag('td', '', String(scoreFor(state, player))),
     );
     table.append(row);
   }
 
   wrap.append(table);
+  if (state.players.some((p) => p.medals)) {
+    wrap.append(tag('p', 'scoreboard-note', '🏅 Chautari medals are just for fun — they never count toward the score.'));
+  }
 
   const foot = document.createElement('div');
   foot.className = 'card-foot';
+  if (openChautari) {
+    const party = actionButton('🌳 Chautari games', openChautari, false);
+    party.className = 'ghost';
+    foot.append(party);
+  }
   foot.append(actionButton('New journey', () => window.location.reload(), false));
   wrap.append(foot);
 

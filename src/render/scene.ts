@@ -61,7 +61,8 @@ export function createStage(container: HTMLElement): Stage {
 
   const camera = new THREE.PerspectiveCamera(
     45,
-    container.clientWidth / container.clientHeight,
+    // A page that starts hidden has no size yet; assume a wide screen until it does.
+    container.clientHeight > 0 ? container.clientWidth / container.clientHeight : 16 / 9,
     0.1,
     1200,
   );
@@ -85,7 +86,14 @@ export function createStage(container: HTMLElement): Stage {
 
   // Post: a restrained bloom (only truly bright things glow — beacons, the
   // sun, highlight rings), a vignette, then tone mapping + sRGB output.
-  const composer = new EffectComposer(renderer);
+  // The composer renders off-screen, where the canvas's own antialiasing never
+  // applies — so give its target real MSAA, or every edge comes out jagged.
+  const msaaTarget = new THREE.WebGLRenderTarget(
+    Math.max(1, container.clientWidth * pixelRatio),
+    Math.max(1, container.clientHeight * pixelRatio),
+    { type: THREE.HalfFloatType, samples: LOW_QUALITY ? 0 : 4 },
+  );
+  const composer = new EffectComposer(renderer, msaaTarget);
   composer.setPixelRatio(pixelRatio);
   composer.setSize(container.clientWidth, container.clientHeight);
   composer.addPass(new RenderPass(scene, camera));
@@ -112,7 +120,7 @@ export function createStage(container: HTMLElement): Stage {
   const sun = new THREE.DirectionalLight(0xfff0d6, 2.6);
   sun.position.copy(SUN_DIRECTION).multiplyScalar(60);
   sun.castShadow = !LOW_QUALITY;
-  sun.shadow.mapSize.set(3072, 3072);
+  sun.shadow.mapSize.set(4096, 4096);
   sun.shadow.camera.near = 1;
   sun.shadow.camera.far = 220;
   sun.shadow.radius = 3;
@@ -168,7 +176,11 @@ export function createStage(container: HTMLElement): Stage {
       controls.target.lerpVectors(intro.fromTarget, intro.toTarget, k);
       if (intro.t >= 1) intro = null;
     } else if (focusTarget) {
+      // Pan rather than swivel: the camera travels with its target, so the
+      // view keeps its angle instead of twisting toward far-off points.
+      const before = controls.target.clone();
       controls.target.lerp(focusTarget, 1 - Math.pow(0.004, dt));
+      camera.position.add(controls.target.clone().sub(before));
       if (controls.target.distanceTo(focusTarget) < 0.05) focusTarget = null;
     }
     for (const fn of callbacks) fn(dt);
@@ -190,6 +202,9 @@ export function createStage(container: HTMLElement): Stage {
       remaining -= slice;
     }
 
+    // A container with no size (a hidden tab or panel) has nothing to draw
+    // into; rendering anyway only fills the console with framebuffer errors.
+    if (container.clientWidth === 0 || container.clientHeight === 0) return;
     if (LOW_QUALITY) renderer.render(scene, camera);
     else composer.render();
   }
@@ -220,12 +235,17 @@ export function createStage(container: HTMLElement): Stage {
   function resize(): void {
     const w = container.clientWidth;
     const h = container.clientHeight;
+    if (w === 0 || h === 0) return;
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
     composer.setSize(w, h);
   }
   window.addEventListener('resize', resize);
+  // The container can change size without the window doing so (a panel
+  // opening, the page starting out hidden), so watch it directly too.
+  const observer = new ResizeObserver(() => resize());
+  observer.observe(container);
 
   return {
     scene,
@@ -246,7 +266,7 @@ export function createStage(container: HTMLElement): Stage {
 
       // Distance that fits the box both vertically and horizontally.
       const vFov = THREE.MathUtils.degToRad(camera.fov);
-      const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
+      const hFov = 2 * Math.atan(Math.tan(vFov / 2) * (camera.aspect || 16 / 9));
       const distance = Math.max(size.z / 2 / Math.tan(vFov / 2), size.x / 2 / Math.tan(hFov / 2));
 
       // Looking from the south and above, so the Mountain loop reads as depth.
@@ -267,6 +287,16 @@ export function createStage(container: HTMLElement): Stage {
       };
       camera.position.copy(intro.fromPos);
       controls.target.copy(intro.fromTarget);
+
+      // ?cam=px,py,pz,tx,ty,tz pins the view (offsets from the board centre)
+      // — for screenshots and for checking a corner of the board up close.
+      const cam = new URLSearchParams(window.location.search).get('cam')?.split(',').map(Number);
+      if (cam && cam.length === 6 && cam.every(Number.isFinite)) {
+        intro = null;
+        controls.minDistance = 1; // close-ups are the point of a pinned camera
+        camera.position.copy(centre).add(new THREE.Vector3(cam[0], cam[1], cam[2]));
+        controls.target.copy(centre).add(new THREE.Vector3(cam[3], cam[4], cam[5]));
+      }
       controls.update();
 
       sun.position.copy(centre).addScaledVector(SUN_DIRECTION, 80);
@@ -277,6 +307,7 @@ export function createStage(container: HTMLElement): Stage {
       renderer.setAnimationLoop(null);
       window.clearInterval(fallback);
       window.removeEventListener('resize', resize);
+      observer.disconnect();
       controls.dispose();
       composer.dispose();
       renderer.dispose();

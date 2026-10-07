@@ -67,6 +67,12 @@ export function current(state: GameState): Player {
   return state.players[state.currentPlayerIndex];
 }
 
+/** The trip a section's ticket opens, by the name printed on the board ("Eastern Trip"). */
+function tripLabel(state: GameState, section: SectionId): string {
+  const gate = Object.values(state.board.nodes).find((n) => n.requiresTicket === section && n.label);
+  return gate?.label ?? section;
+}
+
 function grantTicket(state: GameState, playerId: number, section: SectionId): GameState {
   const player = state.players.find((p) => p.id === playerId)!;
   if (player.tickets.includes(section)) return state;
@@ -182,8 +188,9 @@ function resolveArrival(state: GameState): GameState {
     for (const section of sections) {
       next = grantTicket(next, player.id, section);
     }
-    if (sections.length > 0) {
-      next = log(next, 'Stopped at the junction — entry ticket acquired.');
+    const fresh = sections.filter((section) => !player.tickets.includes(section));
+    if (fresh.length > 0) {
+      next = log(next, `Stopped at the junction — got the ${fresh.map((x) => tripLabel(state, x)).join(' & ')} ticket.`);
     }
     return { ...next, phase: 'await-draw' };
   }
@@ -368,7 +375,7 @@ export function applyAction(state: GameState, action: Action): GameState {
     case 'CLAIM_COUNTER_TICKET': {
       if (state.phase !== 'ticket-counter') return state;
       const granted = grantTicket(state, player.id, action.section);
-      return { ...log(granted, 'Bought an entry ticket at the counter.'), phase: 'await-draw' };
+      return { ...log(granted, `Bought the ${tripLabel(state, action.section)} ticket at the counter.`), phase: 'await-draw' };
     }
 
     case 'SKIP_COUNTER': {
@@ -419,13 +426,16 @@ export function applyAction(state: GameState, action: Action): GameState {
         minigamePlayed: played ? { game: played.game, target: played.target } : null,
       };
 
+      const newTicket = won && pending.ticketReward && !player.tickets.includes(pending.ticketReward);
       if (won && pending.ticketReward) {
         next = grantTicket(next, player.id, pending.ticketReward);
       }
 
       next = log(
         next,
-        (played ? `${played.game}: ` : '') + minigameSummary(state, pending.spec, roll.total, rivals, target, won),
+        (played ? `${played.game}: ` : '') +
+          minigameSummary(state, pending.spec, roll.total, rivals, target, won) +
+          (newTicket ? ` Won the ${tripLabel(state, pending.ticketReward!)} ticket.` : ''),
       );
 
       // A checkpoint mini-game is followed by the usual card draw; a card's own
@@ -515,6 +525,23 @@ export function applyAction(state: GameState, action: Action): GameState {
         drawnCardId: null,
         pendingMinigame: null,
       };
+    }
+
+    case 'CHAUTARI_RESULT': {
+      // Friendly games are played between turns (or once the journey is
+      // over), so a medal can never land in the middle of a move or a card.
+      if (state.phase !== 'await-roll' && state.phase !== 'game-over') return state;
+      const winners = state.players.filter((p) => action.winners.includes(p.id));
+      const game = String(action.game).slice(0, 40);
+      if (winners.length === 0) return log(state, `Chautari · ${game}: a friendly draw.`);
+      const awarded = {
+        ...state,
+        players: state.players.map((p) =>
+          action.winners.includes(p.id) ? { ...p, medals: (p.medals ?? 0) + 1 } : p,
+        ),
+      };
+      const names = winners.map((p) => p.name).join(' & ');
+      return log(awarded, `Chautari · ${game}: ${names} won a medal 🏅 (just for fun).`);
     }
 
     default:

@@ -46,3 +46,36 @@ export const BOARD_BASE = 0xf7f2e4;
 export const WATER = 0x8fc4d8;
 export const SKY_TOP = 0x9fd0ea;
 export const SKY_BOTTOM = 0xf6ead4;
+
+/** The gated trips, as the printed board and the tickets name them. */
+export const TRIP_LABEL: Partial<Record<SectionId, string>> = {
+  mountain: 'Mountain Expedition',
+  eastern: 'Eastern Trip',
+  westernterai: 'Western Terai Trip',
+  westernhillside: 'Western Hillside Trip',
+};
+
+/** Short names, for a ticket stub or a booth sign. */
+export const TRIP_SHORT: Partial<Record<SectionId, string>> = {
+  mountain: 'Mountain',
+  eastern: 'Eastern',
+  westernterai: 'W. Terai',
+  westernhillside: 'W. Hillside',
+};
+
+/** What each trip is known for: snows, tea gardens, tigers, hill towns. */
+export const TRIP_ICON: Partial<Record<SectionId, string>> = {
+  mountain: '🏔️',
+  eastern: '🍃',
+  westernterai: '🐅',
+  westernhillside: '🏘️',
+};
+
+/** The trip a ticket is for, by name — falling back to the section's own name. */
+export function tripName(section: SectionId): string {
+  return TRIP_LABEL[section] ?? SECTION_LABEL[section];
+}
+
+export function hexColor(c: number): string {
+  return `#${c.toString(16).padStart(6, '0')}`;
+}

@@ -14,8 +14,10 @@
 import { current } from '../../engine/reducer.ts';
 import type { Card, GameState, MinigameResult, Player } from '../../engine/types.ts';
 import { renderCard } from '../cardview.ts';
+import { tripName } from '../../render/palette.ts';
+import { ticketStub } from '../tickets.ts';
 import { GAMES, type MiniGame } from './games.ts';
-import { difficultyFor, judge, participantsFor, pickFor, type Pick } from './pick.ts';
+import { botScore, difficultyFor, judge, participantsFor, pickFor, type Pick } from './pick.ts';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -122,6 +124,10 @@ function renderIntro(panel: HTMLElement, state: GameState, r: Round, online: boo
     body.append(mini);
   }
   const text = el('div', 'mg-intro-text');
+  if (pending.source === 'checkpoint' && pending.ticketReward) {
+    // Show the prize: the ticket this checkpoint gives.
+    body.prepend(ticketStub(pending.ticketReward, { size: 'big' }));
+  }
   text.append(el('p', 'mg-how', r.game.how));
   if (r.duel) {
     text.append(
@@ -139,7 +145,7 @@ function renderIntro(panel: HTMLElement, state: GameState, r: Round, online: boo
         'p',
         'mg-goal',
         pending.source === 'checkpoint'
-          ? `Score ${r.target} ${r.game.unit} or more to earn the entry ticket.`
+          ? `Score ${r.target} ${r.game.unit} or more to win the ${pending.ticketReward ? tripName(pending.ticketReward) : 'entry'} ticket.`
           : `Score ${r.target} ${r.game.unit} or more to collect this card.`,
       ),
     );
@@ -233,6 +239,17 @@ export async function playMinigame(root: HTMLElement, state: GameState): Promise
     const scores: Array<{ player: Player; score: number; summary: string }> = [];
     for (let i = 0; i < r.players.length; i++) {
       const p = r.players[i];
+      if (p.bot) {
+        // A computer traveler "plays" while everyone watches the dots.
+        panel.replaceChildren();
+        const ready = el('div', 'mg-ready');
+        ready.append(swatch(p.color), el('h2', '', `🤖 ${p.name} is playing…`), el('p', 'mg-pending', '● ● ●'));
+        panel.append(ready);
+        await new Promise((res) => setTimeout(res, 1400));
+        const score = botScore(r.pick.game, r.difficulty, state.rngCursor * 7 + p.id * 131 + state.turn);
+        scores.push({ player: p, score, summary: 'computer' });
+        continue;
+      }
       if (r.duel) {
         panel.replaceChildren();
         const ready = el('div', 'mg-ready');

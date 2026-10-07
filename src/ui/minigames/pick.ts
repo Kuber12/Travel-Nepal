@@ -34,6 +34,9 @@ export const GAME_TARGETS: Record<string, [number, number, number]> = {
   flags: [4, 5, 6],
   match: [50, 60, 66],
   quiz: [200, 230, 300],
+  stack: [6, 9, 12],
+  swing: [40, 55, 70],
+  lamps: [14, 20, 26],
 };
 
 export const GAME_TITLES: Record<string, string> = {
@@ -44,6 +47,9 @@ export const GAME_TITLES: Record<string, string> = {
   flags: 'Prayer Flag Memory',
   match: 'Pair Up',
   quiz: "Guide's Quiz",
+  stack: 'Momo Tower',
+  swing: 'Dashain Ping',
+  lamps: 'Tihar Diyo',
 };
 
 export type Pick = { game: string; theme?: GameTheme };
@@ -96,6 +102,18 @@ export function participantsFor(state: GameState): number[] {
   if (!pending) return [];
   const me = state.players[state.currentPlayerIndex];
   return [me.id, ...rivalsFor(state, pending.spec).map((p) => p.id)];
+}
+
+/**
+ * A computer traveler's score: somewhere either side of the bar, so it wins
+ * about half the time and a sharp human beats it more often than not.
+ */
+export function botScore(game: string, difficulty: Difficulty, seed: number): number {
+  const target = GAME_TARGETS[game]?.[difficulty] ?? 10;
+  let s = (seed * 2654435761) >>> 0 || 1;
+  s = (s * 1664525 + 1013904223) >>> 0;
+  const r = s / 4294967296;
+  return Math.max(0, Math.round(target * (0.62 + r * 0.6)));
 }
 
 /** Turn the scores people posted into the result the reducer takes. */

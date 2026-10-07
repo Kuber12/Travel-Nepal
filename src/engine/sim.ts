@@ -236,6 +236,52 @@ check(
   check(solo.minigameWon === true && solo.phase === 'resolve-card', 'a passed solo mini-game was not won');
 }
 
+// Chautari medals are just for fun: they never touch the score, the winner,
+// the dice or the turn, and they can't be handed out mid-move.
+{
+  const { state: done } = playGame(21, 3);
+  const winnerBefore = done.winnerId;
+  const scoresBefore = done.players.map((p) => scoreFor(done, p));
+  const loser = done.players.find((p) => p.id !== winnerBefore)!;
+  let partied = done;
+  for (let i = 0; i < 5; i++) partied = applyAction(partied, { type: 'CHAUTARI_RESULT', game: 'Bagh-Chal', winners: [loser.id] });
+  check(partied.players.find((p) => p.id === loser.id)!.medals === 5, 'Chautari medals were not counted');
+  check(partied.winnerId === winnerBefore, 'Chautari medals changed the winner');
+  check(
+    JSON.stringify(partied.players.map((p) => scoreFor(partied, p))) === JSON.stringify(scoresBefore),
+    'Chautari medals changed a score',
+  );
+  check(partied.rngCursor === done.rngCursor && partied.turn === done.turn, 'a Chautari result consumed randomness or a turn');
+
+  const fresh3 = fresh(4, 3);
+  const between = applyAction(fresh3, { type: 'CHAUTARI_RESULT', game: 'Tug of War', winners: [1, 2] });
+  check(between.phase === 'await-roll' && between.currentPlayerIndex === 0, 'a Chautari result moved the turn on');
+  check(between.players[1].medals === 1 && between.players[2].medals === 1 && between.players[0].medals === 0, 'shared Chautari medals went astray');
+
+  const midMove = applyAction(fresh3, { type: 'ROLL' });
+  check(
+    applyAction(midMove, { type: 'CHAUTARI_RESULT', game: 'Catch!', winners: [0] }) === midMove,
+    'a Chautari medal was handed out in the middle of a move',
+  );
+}
+
+// Chosen names, colours and hats reach the travelers, in turn order.
+{
+  const custom = newGame({
+    seed: 9,
+    boardFile: BOARD,
+    deckFiles: DECK_FILES,
+    travelers: [
+      { name: 'Asha', color: '#7e4fc4', hat: 'topi' },
+      { name: 'Bikash', color: '#1f9aa8', hat: 'beanie', bot: true },
+      { name: 'Chhiring', color: '#c8342f' },
+    ],
+  });
+  check(custom.players.map((p) => p.name).join() === 'Asha,Bikash,Chhiring', 'chosen names were not used');
+  check(custom.players[0].color === '#7e4fc4' && custom.players[1].hat === 'beanie', 'chosen colours or hats were lost');
+  check(custom.players[1].bot === true && !custom.players[0].bot, 'the computer traveler flag was lost');
+}
+
 const label = failures === 0 ? 'PASS' : 'FAIL';
 console.log(
   `${label}  ${games} games, ${finished} finished, avg ${(totalTurns / Math.max(finished, 1)).toFixed(1)} turns, ${failures} failure(s)`,

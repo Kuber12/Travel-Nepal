@@ -26,7 +26,7 @@ import wild from './data/decks/wild.json' with { type: 'json' };
 import type { DeckFile } from './engine/decks.ts';
 import { nextAction } from './engine/autoplay.ts';
 import { applyAction, current } from './engine/reducer.ts';
-import { newGame, type BoardFile } from './engine/setup.ts';
+import { newGame, type BoardFile, type TravelerSetup } from './engine/setup.ts';
 import type { Action, GameState } from './engine/types.ts';
 
 import { buildBoard } from './render/board3d.ts';
@@ -39,10 +39,14 @@ import { createStage } from './render/scene.ts';
 import { createOverlay } from './ui/cardmodal.ts';
 import { createHand } from './ui/hand.ts';
 import { closeMinigame, minigameRunning, playMinigame, playOwnRound, showResult, showWaiting } from './ui/minigames/host.ts';
+import { participantsFor } from './ui/minigames/pick.ts';
 import { runLobby, setRoomParam } from './ui/lobby.ts';
 import { forgetSeat, type NetClient } from './net/client.ts';
 import { checksum, type ServerMessage } from './net/protocol.ts';
 import { createHud } from './ui/hud.ts';
+import { createChautari } from './ui/chautari.ts';
+import { celebrateTicket } from './ui/tickets.ts';
+import { nodeAt } from './engine/board.ts';
 
 const DECK_FILES = [
   nepalmandal, chitwan, lumbini, pokhara, himalayan, eastern, westernterai, westernhillside, mountain, wild,
@@ -55,6 +59,9 @@ const seedParam = params.get('seed');
 const playersParam = params.get('players');
 /** ?auto=1 lets the travelers play themselves — a demo, and a way to smoke-test the flow. */
 const autoPlay = params.get('auto') === '1';
+
+/** Height from the spinner's origin down to the bottom of its wooden base. */
+const SPINNER_STAND = 1.33;
 
 /** The board never changes, so the world can be built before anyone joins. */
 const BOARD_STATE = newGame({ seed: 1, playerCount: 2, boardFile: BOARD, deckFiles: DECK_FILES }).board;
@@ -103,6 +110,9 @@ function startGame(initial: GameState, online: Online | null): void {
   /** The Maane prayer-wheel spinner — what moves you, 1 to 8. */
   const spinner = buildSpinner();
   stage.scene.add(spinner.group);
+  // It lives in the Maane Chowk shrine on the east panel; its base sits on the plinth.
+  spinner.group.position.copy(scenery.spinnerHome).add(new THREE.Vector3(0, SPINNER_STAND, 0));
+  spinner.faceToward(stage.camera.position);
 
   stage.onFrame((dt) => {
     pawns.update(dt);
@@ -122,16 +132,58 @@ function startGame(initial: GameState, online: Online | null): void {
     (action) => void dispatch(action),
     (playerId) => hand.view(playerId),
   );
-  const overlay = createOverlay(document.getElementById('overlay')!, (action) => void dispatch(action));
+  const overlay = createOverlay(
+    document.getElementById('overlay')!,
+    (action) => void dispatch(action),
+    () => chautari.openMenu(),
+  );
 
   /** True while an animation is playing; input is locked so state can't race it. */
   let busy = false;
+
+  /** Friendly games between turns. Medals only — the score never changes. */
+  const chautari = createChautari({
+    root: document.getElementById('chautari')!,
+    state: () => state,
+    blocked: () => busy || minigameRunning() || (net !== null && queue.length > 0),
+    award: (game, winners) => void dispatch({ type: 'CHAUTARI_RESULT', game, winners }),
+    net,
+    me,
+    changed: () => {
+      render();
+      computerMoves();
+    },
+  });
   /** Online: travelers who have dropped off. */
   let away: number[] = [];
 
-  const myTurn = (): boolean => me === null || current(state).id === me;
+  /** Can the person at this screen act now? Not online when it's someone else's turn, nor on a computer traveler's turn. */
+  const myTurn = (): boolean => (me === null ? !current(state).bot || autoPlay : current(state).id === me);
+  /** On one device: is the computer playing the traveler whose turn it is? */
+  const computerTurn = (): boolean => !net && (autoPlay || Boolean(current(state).bot));
+
+  /** Tickets each traveler held at the last render, to spot a new one. */
+  const ticketsSeen = new Map<number, string[]>();
+  function announceTickets(): void {
+    for (const player of state.players) {
+      const before = ticketsSeen.get(player.id);
+      ticketsSeen.set(player.id, [...player.tickets]);
+      if (!before) continue; // the first look is not news
+      for (const section of player.tickets) {
+        if (before.includes(section)) continue;
+        const kind = nodeAt(state.board, player.nodeId).kind;
+        const how =
+          kind === 'checkpoint' ? 'won a ticket at the checkpoint!'
+          : kind === 'junction' ? 'picked up a ticket at the junction!'
+          : kind === 'ticket-counter' ? 'bought a ticket at the counter!'
+          : 'got a ticket!';
+        celebrateTicket(player, section, how);
+      }
+    }
+  }
 
   function render(): void {
+    announceTickets();
     const turnHolder = current(state);
     let note: string | undefined;
     if (net && !net.connected) note = 'Connection lost — reconnecting to the room…';
@@ -139,9 +191,13 @@ function startGame(initial: GameState, online: Online | null): void {
       note = away.includes(turnHolder.id)
         ? `${turnHolder.name} has dropped off. If they don't come back soon, the game plays their turn for them.`
         : `Waiting for ${turnHolder.name}…`;
+    } else if (!net && turnHolder.bot && !autoPlay && state.phase !== 'game-over') {
+      note = `🤖 ${turnHolder.name} (computer) is taking their turn…`;
     }
-    hud.render(state, busy || !myTurn(), net ? { note, me: me!, away, room: net.code } : {});
-    overlay.render(state, busy, net && !myTurn() ? turnHolder.name : undefined);
+    const fun = { enabled: chautari.canOpen(), open: () => chautari.openMenu() };
+    const locked = busy || !myTurn() || chautari.isOpen();
+    hud.render(state, locked, net ? { note, me: me!, away, room: net.code, chautari: fun } : { note, chautari: fun });
+    overlay.render(state, busy, !myTurn() && !autoPlay ? turnHolder.name : undefined);
     hand.render(state);
 
     pawns.setActive(turnHolder.id);
@@ -170,7 +226,9 @@ function startGame(initial: GameState, online: Online | null): void {
       !action.result &&
       !autoPlay &&
       state.pendingMinigame &&
-      state.pendingMinigame.spec.type !== 'feast'
+      state.pendingMinigame.spec.type !== 'feast' &&
+      // Computer travelers only ever play against people; on their own they roll.
+      participantsFor(state).some((id) => !state.players.find((p) => p.id === id)?.bot)
     ) {
       busy = true;
       render();
@@ -197,14 +255,23 @@ function startGame(initial: GameState, online: Online | null): void {
     }
 
     render();
+    computerMoves();
+  }
 
-    if (autoPlay) {
+  // --- computer travelers (and ?auto=1) ----------------------------------------
+
+  let botTimer = 0;
+  /** If the computer is playing this turn, take its next step after a beat. */
+  function computerMoves(): void {
+    window.clearTimeout(botTimer);
+    if (!computerTurn() || busy || state.phase === 'game-over' || chautari.isOpen()) return;
+    // Give people time to read a computer traveler's card before it's filed.
+    const pause = autoPlay ? 450 : state.phase === 'resolve-card' ? 1800 : 850;
+    botTimer = window.setTimeout(() => {
+      if (busy || minigameRunning() || chautari.isOpen() || !computerTurn()) return;
       const next = nextAction(state);
-      if (next) {
-        await wait(450);
-        void dispatch(next);
-      }
-    }
+      if (next) void dispatch(next);
+    }, pause);
   }
 
   async function playOut(action: Action, previous: GameState): Promise<void> {
@@ -213,10 +280,8 @@ function startGame(initial: GameState, online: Online | null): void {
     switch (action.type) {
       case 'ROLL': {
         if (state.lastRoll) {
-          stage.focusOn(board.worldPos(mover.nodeId));
-          await spinBeside(mover.nodeId, state.lastRoll.dice[0]);
+          await spinAtChowk(state.lastRoll.dice[0]);
         }
-        spinner.hide();
         await walkPawn(mover.id);
         await finish({ type: 'MOVE_COMPLETE' });
         break;
@@ -260,15 +325,12 @@ function startGame(initial: GameState, online: Online | null): void {
     await wait(linger);
   }
 
-  /** Spin the prayer wheel next to the traveler, number turned toward the camera. */
-  async function spinBeside(nodeId: string, value: number): Promise<void> {
-    const at = board.standPos(nodeId);
-    // Offset toward the camera so the wheel never stands inside a pawn or a temple.
-    const toCam = stage.camera.position.clone().sub(at).setY(0).normalize();
-    spinner.group.position.set(at.x + toCam.x * 2.4, at.y + 1.25, at.z + toCam.z * 2.4);
+  /** Spin the prayer wheel in its shrine, number turned toward the camera. */
+  async function spinAtChowk(value: number): Promise<void> {
+    stage.focusOn(spinner.group.position.clone().setY(scenery.spinnerHome.y));
     spinner.faceToward(stage.camera.position);
     await spinner.roll([value]);
-    await wait(650);
+    await wait(900);
   }
 
   /** Hop the pawn along whatever path the reducer queued, then clear it. */
@@ -396,6 +458,13 @@ function startGame(initial: GameState, online: Online | null): void {
     net.on((msg) => {
       if (msg.t === 'lobby') {
         away = msg.players.filter((p) => !p.connected).map((p) => p.seat);
+        chautari.setAway(away);
+        render();
+        return;
+      }
+      if (msg.t === 'fun') {
+        // The Chautari draws itself straight away; it doesn't wait on board animations.
+        chautari.onServer(msg.fun);
         render();
         return;
       }
@@ -430,7 +499,7 @@ function startGame(initial: GameState, online: Online | null): void {
   // --- keyboard: space is the primary action ----------------------------------
 
   window.addEventListener('keydown', (event) => {
-    if (event.code !== 'Space' || busy || minigameRunning() || !myTurn()) return;
+    if (event.code !== 'Space' || busy || minigameRunning() || chautari.isOpen() || !myTurn()) return;
     if ((event.target as HTMLElement | null)?.tagName === 'INPUT') return;
     event.preventDefault();
 
@@ -457,11 +526,7 @@ function startGame(initial: GameState, online: Online | null): void {
   });
 
   render();
-
-  if (autoPlay && !net) {
-    const opening = nextAction(state);
-    if (opening) void dispatch(opening);
-  }
+  computerMoves();
 
   /** A read-only snapshot for debugging from the browser console. */
   (window as unknown as Record<string, unknown>).travelNepal = () => ({
@@ -478,15 +543,32 @@ function startGame(initial: GameState, online: Online | null): void {
       finished: p.finished,
     })),
     log: state.log.slice(-6).map((e) => e.text),
+    scene: sceneStats(),
   });
+}
+
+/** What the world costs to draw: meshes (≈ draw calls) and triangles, instances included. */
+function sceneStats(): { meshes: number; triangles: number } {
+  let meshes = 0;
+  let triangles = 0;
+  stage.scene.traverseVisible((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    meshes++;
+    const geo = mesh.geometry;
+    const tris = (geo.index ? geo.index.count : geo.attributes.position.count) / 3;
+    triangles += tris * ((o as THREE.InstancedMesh).isInstancedMesh ? (o as THREE.InstancedMesh).count : 1);
+  });
+  return { meshes, triangles: Math.round(triangles) };
 }
 
 // --- start: straight in for demo/debug URLs, otherwise the start screen ---------------
 
-function localGame(players: number): GameState {
+function localGame(players: number, travelers?: TravelerSetup[]): GameState {
   return newGame({
     seed: seedParam ? Number(seedParam) : undefined,
     playerCount: players,
+    travelers,
     boardFile: BOARD,
     deckFiles: DECK_FILES,
   });
@@ -496,7 +578,7 @@ if (autoPlay || seedParam || playersParam) {
   startGame(localGame(playersParam ? Number(playersParam) : 2), null);
 } else {
   void runLobby(document.getElementById('lobby')!).then((choice) => {
-    if (choice.kind === 'local') startGame(localGame(choice.players), null);
+    if (choice.kind === 'local') startGame(localGame(choice.travelers.length, choice.travelers), null);
     else startGame(choice.state, { net: choice.net, seq: choice.seq });
   });
 }

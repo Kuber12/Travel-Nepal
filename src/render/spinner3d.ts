@@ -1,21 +1,24 @@
 /**
  * The Maane — an eight-sided brass prayer wheel that replaces the dice for
- * movement. Each face carries a number 1–8 (with its Devanagari numeral) on a
- * lacquered panel. It whirls, slows, and settles with the engine's number
- * turned toward the camera under a little brass pointer.
+ * movement. Each face carries one of the eight Ashtamangala symbols, its
+ * number 1–8 and the Devanagari numeral on a lacquered panel. It stands in its
+ * own shrine, the Maane Chowk, at the east edge of the board; it whirls,
+ * slows, and settles with the engine's number turned toward the camera under
+ * a little brass pointer, and the symbol's name lights up above it.
  *
  * Like the dice, it decides nothing: the reducer has already picked the
  * number; this only shows it.
  */
 
 import * as THREE from 'three';
+import { ASHTAMANGALA, drawSymbol } from './ashtamangala.ts';
 
 const SIDES = 8;
 const RADIUS = 0.78;
 const HEIGHT = 1.5;
 const SPIN_TIME = 1.9;
 const DEVANAGARI = ['१', '२', '३', '४', '५', '६', '७', '८'];
-const PANEL_COLOURS = ['#b2283a', '#1f5fa8', '#2f8a4a', '#d98a1c', '#b2283a', '#1f5fa8', '#2f8a4a', '#d98a1c'];
+const PANEL_COLOURS = ['#a8223a', '#1d4f96', '#25784a', '#6b2a8a', '#a8223a', '#1d4f96', '#25784a', '#6b2a8a'];
 
 export type SpinnerView = {
   group: THREE.Group;
@@ -56,23 +59,30 @@ function drumTexture(): THREE.CanvasTexture {
       g.fill();
     }
 
-    // Lacquered panel with the number.
+    // Lacquered panel: the Ashtamangala symbol, the number, the Devanagari numeral.
     g.fillStyle = PANEL_COLOURS[i];
     g.beginPath();
-    g.roundRect(x + 30, 70, cell - 60, 248, 26);
+    g.roundRect(x + 26, 64, cell - 52, 260, 26);
     g.fill();
     g.strokeStyle = '#fff1c4';
     g.lineWidth = 7;
     g.stroke();
+    g.strokeStyle = 'rgba(255, 241, 196, 0.45)';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.roundRect(x + 38, 76, cell - 76, 236, 18);
+    g.stroke();
+
+    drawSymbol(g, i, x + cell / 2, 128, 46, '#f6d77a', '#5a2a08');
 
     g.fillStyle = '#fff6d8';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.font = 'bold 150px Georgia, serif';
-    g.fillText(String(i + 1), x + cell / 2, 178);
-    g.font = 'bold 54px "Noto Sans Devanagari", "Kohinoor Devanagari", sans-serif';
-    g.fillStyle = 'rgba(255, 238, 190, 0.9)';
-    g.fillText(DEVANAGARI[i], x + cell / 2, 278);
+    g.font = 'bold 104px Georgia, serif';
+    g.fillText(String(i + 1), x + cell / 2, 228);
+    g.font = 'bold 44px "Noto Sans Devanagari", "Kohinoor Devanagari", sans-serif';
+    g.fillStyle = 'rgba(255, 238, 190, 0.92)';
+    g.fillText(DEVANAGARI[i], x + cell / 2, 290);
 
     // A seam between faces.
     g.fillStyle = 'rgba(80, 40, 5, 0.45)';
@@ -81,13 +91,42 @@ function drumTexture(): THREE.CanvasTexture {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
+  texture.anisotropy = 16;
   return texture;
 }
 
+/** The floating name plate shown once the wheel settles: "५ · Kalasha — Treasure Vase". */
+function labelTexture(value: number): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 640;
+  canvas.height = 150;
+  const g = canvas.getContext('2d')!;
+  g.fillStyle = 'rgba(48, 20, 14, 0.9)';
+  g.beginPath();
+  g.roundRect(6, 6, 628, 138, 40);
+  g.fill();
+  g.strokeStyle = '#e2b23a';
+  g.lineWidth = 6;
+  g.stroke();
+  drawSymbol(g, value - 1, 82, 75, 48, '#f6d77a', '#5a2a08');
+  const sym = ASHTAMANGALA[value - 1];
+  g.fillStyle = '#fff3d0';
+  g.textBaseline = 'middle';
+  g.font = 'bold 54px Georgia, serif';
+  g.fillText(`${value}  ${sym.name}`, 150, 58);
+  g.fillStyle = 'rgba(255, 228, 170, 0.85)';
+  g.font = 'italic 34px Georgia, serif';
+  g.fillText(`${DEVANAGARI[value - 1]} · ${sym.meaning}`, 152, 108);
+  const t = new THREE.CanvasTexture(canvas);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+const labelTextures = new Map<number, THREE.CanvasTexture>();
+
 export function buildSpinner(): SpinnerView {
   const group = new THREE.Group();
-  group.visible = false;
+  // The wheel lives in its shrine and is always on show.
 
   const brass = new THREE.MeshStandardMaterial({ color: 0xd9a84a, roughness: 0.28, metalness: 0.9 });
   const darkBrass = new THREE.MeshStandardMaterial({ color: 0x9a6a1c, roughness: 0.35, metalness: 0.85 });
@@ -156,6 +195,14 @@ export function buildSpinner(): SpinnerView {
   pointerHolder.add(post, drop, arrow);
   group.add(pointerHolder, glow);
 
+  const label = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false, opacity: 0 }));
+  label.scale.set(3.4, 0.8, 1);
+  label.position.y = HEIGHT / 2 + 1.75;
+  label.renderOrder = 10;
+  label.visible = false;
+  group.add(label);
+  let shown = 0;
+
   let facing = 0; // yaw of the side that should show the number
   let spin: { t: number; from: number; to: number; resolve: () => void } | null = null;
   let settled = 0;
@@ -166,6 +213,16 @@ export function buildSpinner(): SpinnerView {
     const theta = ((value - 1 + 0.5) * Math.PI * 2) / SIDES;
     return facing - theta;
   }
+
+  const idle = (dt: number): void => {
+    if (label.visible) {
+      shown = Math.min(shown + dt * 3, 1);
+      (label.material as THREE.SpriteMaterial).opacity = shown;
+      label.position.y = HEIGHT / 2 + 1.55 + shown * 0.2;
+    }
+    // A slow drift between turns, like a wheel a passer-by has nudged.
+    if (!spin && !label.visible) wheel.rotation.y += dt * 0.15;
+  };
 
   return {
     group,
@@ -181,6 +238,15 @@ export function buildSpinner(): SpinnerView {
       group.visible = true;
       settled = 0;
       const value = values[0] ?? 1;
+      let tex = labelTextures.get(value);
+      if (!tex) {
+        tex = labelTexture(value);
+        labelTextures.set(value, tex);
+      }
+      (label.material as THREE.SpriteMaterial).map = tex;
+      (label.material as THREE.SpriteMaterial).needsUpdate = true;
+      label.visible = false;
+      shown = 0;
       const from = wheel.rotation.y;
       // At least four whole turns, landing exactly on the number.
       let to = angleFor(value);
@@ -192,13 +258,16 @@ export function buildSpinner(): SpinnerView {
     },
 
     hide() {
-      group.visible = false;
+      // The wheel stays in its shrine; this just ends any spin and the name plate.
       spin?.resolve();
       spin = null;
+      label.visible = false;
+      shown = 0;
     },
 
     update(dt) {
       if (!group.visible) return;
+      idle(dt);
       if (spin) {
         spin.t = Math.min(spin.t + dt / SPIN_TIME, 1);
         // Fast start, long easing finish — like a hand-flicked wheel.
@@ -212,13 +281,15 @@ export function buildSpinner(): SpinnerView {
         if (spin.t >= 1) {
           const done = spin.resolve;
           spin = null;
+          label.visible = true;
+          shown = 0.001;
           done();
         }
         (glow.material as THREE.MeshBasicMaterial).opacity = 0;
       } else {
         settled = Math.min(settled + dt * 3, 1);
         chainPivot.rotation.z *= 0.9;
-        (glow.material as THREE.MeshBasicMaterial).opacity = settled * 0.85;
+        (glow.material as THREE.MeshBasicMaterial).opacity = label.visible || shown > 0 ? settled * 0.85 : 0;
         glow.scale.setScalar(0.7 + settled * 0.4);
       }
     },

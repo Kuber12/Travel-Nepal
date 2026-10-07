@@ -11,14 +11,24 @@ npm run dev
 Then open http://localhost:5173. The start screen offers three ways to play:
 on this device (hot-seat), host an online room, or join one.
 
+**Setting up the trip.** On one device, *Set up the trip* lets you name every
+traveler, pick their colour and hat (sun hat, Dhaka topi, trekking cap or
+woolly hat), and make any of them a **computer traveler** that plays its own
+turns. Tick *Draw lots* to shuffle who goes first. The line-up is remembered
+for the rematch. Online, each player types their name before hosting or
+joining, and picks a colour and hat in the room lobby.
+
 | URL parameter | Effect |
 | --- | --- |
 | `?seed=42` | Replay an identical game. Same seed ⇒ same dice, same shuffles. |
 | `?players=4` | Two to four travelers (default 2). |
 | `?auto=1` | The travelers play themselves — a demo, and a flow smoke-test. |
+| `?cam=x,y,z,tx,ty,tz` | Pin the camera (offsets from the board centre) — for close-up screenshots. |
 
 Space bar triggers whatever the current primary action is (spin, draw, end turn…). Drag to orbit, scroll
 to zoom. At a junction, click a glowing tile or use the buttons in the panel.
+`travelNepal()` in the browser console prints the game state and what the
+scene costs to draw.
 
 ## What's built
 
@@ -46,17 +56,61 @@ Implemented from the printed rules:
   (ten steps forward), Extend Vacation (ten steps back).
 - **Scoring**: passport points, ties broken by number of cards.
 
+## The Chautari — friendly games
+
+A *chautari* is the stone platform under a pipal tree where travellers in
+Nepal put their loads down and rest. Here it's the friendly-games corner:
+between turns (and after the journey ends), press **🌳 Chautari** and play
+each other. Winners get a **medal 🏅**. Medals are just for fun — they never
+count toward the score or decide who wins — and the scoreboard shows them
+separately.
+
+| Game | Players | How it plays |
+| --- | --- | --- |
+| Bagh-Chal | 2 | Nepal's own board game: four tigers hunt, twenty goats try to hem them in. Tigers win with five captures. |
+| Dori Tanne | 2 | Tug of war — hammer your key faster than your rival (A vs L on one keyboard). |
+| Momo Tower | 1–4 | Drop momos on the steamer and build the tallest tower. |
+| Dashain Ping | 1–4 | Pump the bamboo swing at the bottom of each arc to soar highest. |
+| Tihar Diyo | 1–4 | Relight the festival lamps as they flicker out (mouse, touch or Q–V keys). |
+| Momo Rush, Summit Sprint, Rhino Snapshot, Prayer Flag Memory, Guide's Quiz | 1–4 | The board's mini-games, as straight races. |
+
+In a race everyone plays the very same round (same seed), so it's fair; a
+one-player race is practice. Computer travelers can play too, including a
+Bagh-Chal AI. Online, the server runs the match: it invites the players,
+collects race scores, referees Bagh-Chal with the same rules module the
+browser uses (`src/fun/`), owns the tug-of-war rope at 10 Hz, and hands out
+medals through the game's own action stream (`CHAUTARI_RESULT`), so every
+screen agrees. The journey waits while a match is on.
+
 ## The world around the board
 
 All renderer-side (nothing in `src/engine/` changed):
 
+- **The country on the board** follows Nepal's own geography, south to north:
+  the flat green Terai (sal forest, banana groves, bamboo, rice paddies
+  standing in water), the middle hills (broadleaf woods with rhododendron in
+  bloom, hillsides cut into rice terraces, the odd golden mustard field), and
+  pine and fir climbing to the snows. Along the board's north edge rises the
+  Himalaya, west to east as on the map — Dhaulagiri, Annapurna, Machhapuchhre,
+  Manaslu, Langtang, Everest, Lhotse, Makalu, Kanchenjunga — and the Mountain
+  Expedition is one connected massif with base camp on its moraine. Every
+  slope and forest is masked off the roads (`render/clearance.ts`), so nothing
+  hides a tile. All seeded: every screen grows the same world.
+- **Mountains** (`render/mountains.ts`): height-field massifs with spur ridges,
+  snow that settles on the gentler faces and leaves steep rock bare, a
+  connected ridge strip for whole ranges, and stepped terraced hills.
 - **Environment** (`render/environment.ts`): a painted sky dome with a morning sun,
-  the valley the board sits in (terraced foothills, ~1,600 instanced pines), the
-  Himalaya in three rows of faceted peaks with Machhapuchhre's fishtail, and
-  drifting clouds. A slow camera fly-in opens the game; any drag skips it.
+  the green valley the board sits in (rice terraces and mustard fields,
+  ~3,600 instanced pines and broadleaf trees, hamlets on the ridges), the
+  Himalaya in three rows of snow giants plus ranges wrapping east and west,
+  Machhapuchhre's fishtail, Everest trailing its plume, and drifting clouds.
+  A slow camera fly-in opens the game; any drag skips it.
 - **The board** (`render/board3d.ts`): a printed card face with a dhaka-weave
   border, corner mandalas and the title; a lacquered wooden frame with brass
-  corners; bevelled tiles; checkpoint barriers with a STOP sign and blinking lamp;
+  corners; bevelled tiles with embossed letters; checkpoints with a striped
+  barrier, STOP sign, blinking lamp and a sentry post flying Nepal's flag;
+  Newar-style ticket booths with carved windows and pagoda roofs; carved
+  signposts at junctions; carved wooden name boards for every region; and
   junction choices glow with a ring and a beam of light.
 - **Props** (`render/props.ts`): Boudhanath with its painted eyes and 13-ring
   spire, Newar pagodas with flared eaves, a shikhara, chortens, a Bodhi tree,
@@ -67,9 +121,15 @@ All renderer-side (nothing in `src/engine/` changed):
   the range, paragliders over Phewa Lake, chimney smoke in the Himalayan
   village; plus turning prayer wheels, bobbing doongas, rippling water, a rhino
   and an elephant that move.
-- **Pawns** (`render/pawn.ts`): little travelers (hat, jacket, backpack and
-  bedroll) on brass-rimmed bases; the active one has a spinning gem overhead
-  and a glowing ring underfoot; hops squash-and-stretch and kick up dust.
+- **Pawns** (`render/pawn.ts`): little travelers on enamel, brass-rimmed bases,
+  in the colour and hat each player picked, with a face, a white khata scarf,
+  a backpack and bedroll and a trekking pole, and a floating name tag; the
+  active one's tag is gold-rimmed with a spinning gem overhead and a glowing
+  ring underfoot; hops squash-and-stretch and kick up dust.
+- **Draw calls** (`render/bake.ts`): props are built from many small parts;
+  static ones are baked — look-alike parts merged into one mesh — so the
+  whole world costs a few hundred draw calls fewer. Animated parts (prayer
+  wheels, flags, animals' heads and tails) are left whole.
 - **Post** (`render/scene.ts`): image-based lighting, soft shadows, a restrained
   bloom (only beacons and highlights glow), a vignette, and valley haze.
 
@@ -167,9 +227,10 @@ result (autoplay, `npm run sim`) it falls back to the Ashtamangal die.
 ```
 src/
   engine/     the rules — pure, deterministic, no three.js, no DOM
+  fun/        the Chautari's games as pure rules (Bagh-Chal, tug of war) + its catalogue
   data/       the board graph and the card decks, as JSON
-  render/     three.js: board, pawns, dice, scenery, camera
-  ui/         the side panel, cards and hand, mini-games, the lobby
+  render/     three.js: board, pawns, dice, scenery, mountains, camera
+  ui/         the side panel, cards and hand, mini-games, the Chautari, the lobby
   net/        the wire protocol and the browser's socket client
   main.ts     wiring, and the single dispatch chokepoint
 server/       the room server (and netsim, its online test)
@@ -214,8 +275,13 @@ npm run build       # production bundle
 `npm run sim` plays whole games with the autoplayer and asserts the things that
 would be painful to find by hand: nobody enters a gated section without a ticket,
 no move runs through a checkpoint, decks reshuffle instead of running dry,
-non-passport cards never reach a passport, and two games from the same seed
-produce byte-identical results.
+non-passport cards never reach a passport, two games from the same seed
+produce byte-identical results, and Chautari medals never change a score,
+the winner, the dice or the turn.
+
+`npm run netsim` (with `npm run server` running) also plays a score race, a
+full Bagh-Chal game and a tug of war over the wire, and checks every client
+agrees on the medals.
 
 ## Not in this version
 

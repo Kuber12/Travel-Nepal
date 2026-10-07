@@ -106,6 +106,49 @@ function line(g: G, pts: number[], stroke: string, width: number): void {
   g.stroke();
 }
 
+/** A path in local units: x right, y up is negative; scaled by s about (x, y). */
+type Cmd = ['M' | 'L', number, number] | ['Q', number, number, number, number] | ['C', number, number, number, number, number, number] | ['Z'];
+
+function trace(g: G, x: number, y: number, s: number, cmds: Cmd[]): void {
+  g.beginPath();
+  for (const c of cmds) {
+    if (c[0] === 'M') g.moveTo(x + c[1] * s, y + c[2] * s);
+    else if (c[0] === 'L') g.lineTo(x + c[1] * s, y + c[2] * s);
+    else if (c[0] === 'Q') g.quadraticCurveTo(x + c[1] * s, y + c[2] * s, x + c[3] * s, y + c[4] * s);
+    else if (c[0] === 'C') g.bezierCurveTo(x + c[1] * s, y + c[2] * s, x + c[3] * s, y + c[4] * s, x + c[5] * s, y + c[6] * s);
+    else g.closePath();
+  }
+}
+
+function fillPath(g: G, x: number, y: number, s: number, cmds: Cmd[], fill: string | CanvasGradient): void {
+  trace(g, x, y, s, cmds);
+  g.fillStyle = fill;
+  g.fill();
+}
+
+function strokePath(g: G, x: number, y: number, s: number, cmds: Cmd[], stroke: string, width: number): void {
+  trace(g, x, y, s, cmds);
+  g.strokeStyle = stroke;
+  g.lineWidth = width;
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  g.stroke();
+}
+
+/** Draw inside a path only: for stripes, spots and studs on a body. */
+function within(g: G, x: number, y: number, s: number, cmds: Cmd[], paint: () => void): void {
+  g.save();
+  trace(g, x, y, s, cmds);
+  g.clip();
+  paint();
+  g.restore();
+}
+
+/** A soft shadow under an animal's feet. */
+function groundShadow(g: G, x: number, y: number, rx: number, ry: number): void {
+  ellipse(g, x, y, rx, ry, 'rgba(30, 30, 10, 0.18)');
+}
+
 // --- backdrops -------------------------------------------------------------------
 
 const SKIES: Record<Mood, string[]> = {
@@ -240,18 +283,40 @@ function grass(g: G, rnd: Rnd, y0: number, y1: number, n: number, color = '#5f9a
 }
 
 function birds(g: G, rnd: Rnd, n: number, x0 = 0, y0 = 30, w = ART_W, h = 80, color = '#2c2a2e'): void {
+  // Soaring silhouettes: crooked wings, a small body, a tail.
   for (let i = 0; i < n; i++) {
     const x = x0 + rnd() * w;
     const y = y0 + rnd() * h;
-    const s = 4 + rnd() * 5;
-    g.beginPath();
-    g.moveTo(x - s, y - s * 0.4);
-    g.quadraticCurveTo(x - s * 0.4, y - s * 0.6, x, y);
-    g.quadraticCurveTo(x + s * 0.4, y - s * 0.6, x + s, y - s * 0.4);
-    g.strokeStyle = color;
-    g.lineWidth = 1.6;
-    g.stroke();
+    const k = 4 + rnd() * 5;
+    const lift = 0.2 + rnd() * 0.5; // how high the wings are held this instant
+    fillPath(g, x, y, k / 10, [
+      ['M', -10, -2 - lift * 4],
+      ['Q', -5, -6 - lift * 4, -1.2, -0.6],
+      ['L', 0, 1.4],
+      ['L', 1.2, -0.6],
+      ['Q', 5, -6 - lift * 4, 10, -2 - lift * 4],
+      ['Q', 5, -3 - lift * 2, 1, 1],
+      ['L', 0.8, 3],
+      ['L', 0, 2.4],
+      ['L', -0.8, 3],
+      ['L', -1, 1],
+      ['Q', -5, -3 - lift * 2, -10, -2 - lift * 4],
+      ['Z'],
+    ], color);
   }
+}
+
+/** A cattle egret standing in the shallows: white, S-necked, yellow bill, dark legs. */
+function egret(g: G, x: number, y: number, s: number): void {
+  line(g, [x - 2 * s, y - 16 * s, x - 3 * s, y], '#2a2420', 1.6 * s);
+  line(g, [x + 2 * s, y - 16 * s, x + 3 * s, y], '#2a2420', 1.6 * s);
+  fillPath(g, x, y, s, [
+    ['M', -14, -26], ['C', -10, -34, 4, -34, 8, -26], ['C', 10, -20, 2, -15, -4, -16], ['C', -10, -17, -16, -20, -14, -26], ['Z'],
+  ], '#f8f6f0');
+  strokePath(g, x, y, s, [['M', 5, -28], ['C', 12, -34, 2, -40, 8, -46]], '#f8f6f0', 4 * s);
+  circle(g, x + 9 * s, y - 47 * s, 3.6 * s, '#f8f6f0');
+  poly(g, [x + 11 * s, y - 48 * s, x + 20 * s, y - 46 * s, x + 11 * s, y - 45.5 * s], '#f2c230');
+  circle(g, x + 10 * s, y - 48 * s, 0.9 * s, '#222');
 }
 
 /** Lungta prayer flags along a sagging string. */
@@ -440,71 +505,221 @@ function sitter(g: G, x: number, y: number, s: number, robe = '#b8452b'): void {
 }
 
 function rhino(g: G, x: number, y: number, s: number): void {
-  const c = '#8c8f93';
-  ellipse(g, x, y - 40 * s, 62 * s, 32 * s, c);
-  ellipse(g, x + 6 * s, y - 50 * s, 40 * s, 18 * s, shade(c, 0.1));
-  for (const lx of [-40, -18, 22, 42]) rect(g, x + lx * s - 8 * s, y - 24 * s, 16 * s, 24 * s, shade(c, -0.12));
-  poly(g, [x + 50 * s, y - 58 * s, x + 96 * s, y - 40 * s, x + 92 * s, y - 20 * s, x + 50 * s, y - 24 * s], c);
-  poly(g, [x + 84 * s, y - 42 * s, x + 96 * s, y - 70 * s, x + 94 * s, y - 40 * s], '#d8d2c4');
-  poly(g, [x + 56 * s, y - 56 * s, x + 60 * s, y - 70 * s, x + 66 * s, y - 56 * s], c);
-  circle(g, x + 72 * s, y - 44 * s, 2.4 * s, '#222');
-  line(g, [x - 30 * s, y - 64 * s, x - 10 * s, y - 70 * s, x + 20 * s, y - 64 * s], shade(c, -0.15), 2 * s);
+  const c = '#8e8b86';
+  const dk = shade(c, -0.24);
+  const body: Cmd[] = [
+    ['M', -72, -44], ['C', -76, -78, -40, -90, -6, -82], ['C', 18, -92, 48, -90, 58, -72], ['L', 64, -56],
+    ['C', 62, -36, 48, -24, 28, -24], ['L', -44, -22], ['C', -64, -22, -72, -30, -72, -44], ['Z'],
+  ];
+  const leg = (lx: number, fill: string): void => {
+    fillPath(g, x, y, s, [['M', lx - 11, -40], ['L', lx - 12, -6], ['Q', lx, 3, lx + 12, -6], ['L', lx + 11, -40], ['Z']], fill);
+    for (const k of [-6, 0, 6]) ellipse(g, x + (lx + k) * s, y - 2 * s, 3.2 * s, 2.2 * s, shade(c, 0.25));
+  };
+  groundShadow(g, x + 14 * s, y + 2 * s, 86 * s, 7 * s);
+  leg(-40, dk);
+  leg(32, dk);
+  fillPath(g, x, y, s, body, vgrad(g, y - 92 * s, y - 22 * s, [shade(c, 0.18), c, shade(c, -0.12)]));
+  // The studded hide and the deep folds of the armour.
+  within(g, x, y, s, body, () => {
+    for (let i = 0; i < 70; i++) {
+      const px = -66 + ((i * 37) % 128);
+      const py = -80 + ((i * 53) % 54);
+      circle(g, x + px * s, y + py * s, 1.6 * s, 'rgba(255, 255, 255, 0.16)');
+    }
+  });
+  strokePath(g, x, y, s, [['M', 26, -88], ['C', 16, -70, 18, -44, 24, -26]], dk, 2.6 * s);
+  strokePath(g, x, y, s, [['M', -30, -86], ['C', -38, -66, -36, -42, -30, -24]], dk, 2.6 * s);
+  strokePath(g, x, y, s, [['M', -64, -52], ['C', -20, -46, 10, -46, 44, -56]], 'rgba(60, 55, 50, 0.35)', 1.6 * s);
+  leg(-48, c);
+  leg(40, c);
+  // The long, low head with its single horn.
+  fillPath(g, x, y, s, [
+    ['M', 52, -76], ['C', 70, -84, 86, -76, 98, -62], ['C', 106, -54, 114, -46, 118, -38], ['Q', 120, -30, 112, -28],
+    ['C', 100, -26, 84, -30, 70, -36], ['C', 60, -40, 54, -48, 52, -58], ['Z'],
+  ], vgrad(g, y - 84 * s, y - 28 * s, [shade(c, 0.14), c]));
+  fillPath(g, x, y, s, [['M', 99, -52], ['C', 100, -64, 103, -76, 104, -86], ['C', 108, -72, 111, -60, 112, -47], ['Z']], '#5a4c40');
+  fillPath(g, x, y, s, [['M', 62, -78], ['C', 58, -90, 60, -98, 66, -100], ['C', 70, -94, 70, -84, 68, -76], ['Z']], c);
+  line(g, [x + 64 * s, y - 92 * s, x + 66 * s, y - 80 * s], dk, 1.4 * s);
+  circle(g, x + 84 * s, y - 58 * s, 2.4 * s, '#1a1612');
+  circle(g, x + 84.8 * s, y - 58.8 * s, 0.7 * s, '#fff');
+  line(g, [x + 104 * s, y - 32 * s, x + 114 * s, y - 33 * s], dk, 1.2 * s);
+  strokePath(g, x, y, s, [['M', -72, -62], ['C', -80, -54, -80, -44, -78, -36]], c, 2.4 * s);
+  ellipse(g, x - 78 * s, y - 34 * s, 2.6 * s, 4 * s, '#3a3530');
 }
 
 function tiger(g: G, x: number, y: number, s: number): void {
-  const c = '#e08a2c';
-  ellipse(g, x, y - 34 * s, 60 * s, 22 * s, c);
-  for (const lx of [-40, -22, 26, 44]) rect(g, x + lx * s - 6 * s, y - 20 * s, 12 * s, 20 * s, c);
-  circle(g, x + 64 * s, y - 42 * s, 20 * s, c);
-  ellipse(g, x + 76 * s, y - 34 * s, 10 * s, 7 * s, '#f6e6c8');
-  for (const ex of [52, 74]) circle(g, x + ex * s, y - 60 * s, 6 * s, c);
-  circle(g, x + 70 * s, y - 46 * s, 2.4 * s, '#222');
-  g.beginPath();
-  g.moveTo(x - 58 * s, y - 38 * s);
-  g.quadraticCurveTo(x - 90 * s, y - 40 * s, x - 86 * s, y - 70 * s);
-  g.strokeStyle = c;
-  g.lineWidth = 7 * s;
-  g.stroke();
-  for (let k = -4; k <= 4; k++) line(g, [x + k * 12 * s, y - 54 * s, x + k * 12 * s + 4 * s, y - 34 * s], '#2a1a10', 3.5 * s);
-  line(g, [x + 58 * s, y - 56 * s, x + 62 * s, y - 50 * s], '#2a1a10', 2.5 * s);
+  const o = '#e3862a';
+  const od = '#b8601a';
+  const wh = '#f8efe0';
+  const blk = '#1c120c';
+  // A deep chest under a shoulder hump, a tucked waist, a rounded rump.
+  const body: Cmd[] = [
+    ['M', -66, -56], ['C', -66, -72, -50, -78, -30, -76], ['C', -10, -74, 10, -76, 30, -80], ['C', 46, -84, 58, -76, 60, -64],
+    ['C', 64, -50, 60, -36, 50, -32], ['C', 36, -30, 20, -38, -6, -38], ['C', -30, -38, -46, -34, -56, -38],
+    ['C', -66, -42, -68, -50, -66, -56], ['Z'],
+  ];
+  const stripes = (lx: number, top: number, bottom: number, n: number): void => {
+    for (let k = 0; k < n; k++) {
+      const x0 = lx + k * 12;
+      fillPath(g, x, y, s, [['M', x0, top], ['Q', x0 + 6, (top + bottom) / 2, x0 - 2, bottom], ['L', x0 + 2, bottom], ['Q', x0 + 10, (top + bottom) / 2, x0 + 5, top], ['Z']], blk);
+    }
+  };
+  groundShadow(g, x + 6 * s, y + 2 * s, 84 * s, 7 * s);
+  // Far legs, in shadow.
+  fillPath(g, x, y, s, [['M', 30, -46], ['C', 34, -30, 32, -14, 30, -2], ['L', 38, -2], ['C', 40, -16, 42, -32, 40, -48], ['Z']], od);
+  fillPath(g, x, y, s, [['M', -56, -46], ['C', -46, -36, -48, -20, -50, -2], ['L', -42, -2], ['C', -40, -18, -38, -34, -44, -48], ['Z']], od);
+  fillPath(g, x, y, s, body, vgrad(g, y - 80 * s, y - 28 * s, [o, o, od]));
+  within(g, x, y, s, body, () => {
+    ellipse(g, x + 6 * s, y - 32 * s, 52 * s, 8 * s, wh);
+    stripes(-62, -86, -50, 10);
+  });
+  // Near legs: a muscled foreleg, a hind leg bent at the hock.
+  const fore: Cmd[] = [['M', 40, -52], ['C', 50, -40, 48, -20, 46, -4], ['L', 56, -2], ['C', 58, -20, 60, -40, 56, -58], ['Z']];
+  fillPath(g, x, y, s, fore, o);
+  const hind: Cmd[] = [
+    ['M', -66, -58], ['C', -42, -66, -30, -48, -38, -32], ['C', -42, -24, -48, -14, -46, -3], ['L', -37, -2],
+    ['C', -36, -14, -28, -24, -26, -36], ['C', -22, -54, -36, -68, -58, -68], ['Z'],
+  ];
+  fillPath(g, x, y, s, hind, o);
+  within(g, x, y, s, hind, () => stripes(-58, -64, -40, 3));
+  ellipse(g, x + 51 * s, y - 2 * s, 7 * s, 3.4 * s, wh);
+  ellipse(g, x - 42 * s, y - 2 * s, 7 * s, 3.4 * s, wh);
+  // The head: ears, a white ruff, the muzzle, amber eyes, the forehead stripes.
+  for (const ex of [64, 76]) {
+    circle(g, x + ex * s, y - 89 * s, 6.5 * s, o);
+    circle(g, x + ex * s, y - 88 * s, 3 * s, wh);
+  }
+  const head: Cmd[] = [['M', 52, -70], ['C', 56, -90, 84, -94, 94, -78], ['C', 102, -66, 104, -56, 100, -50], ['C', 94, -44, 80, -42, 70, -46], ['C', 60, -50, 52, -58, 52, -70], ['Z']];
+  fillPath(g, x, y, s, head, o);
+  within(g, x, y, s, head, () => {
+    ellipse(g, x + 76 * s, y - 50 * s, 18 * s, 10 * s, wh);
+    for (const [ax, ay] of [[66, -86], [72, -88], [78, -86]]) line(g, [x + ax * s, y + ay * s, x + (ax + 2) * s, y + (ay + 8) * s], blk, 2 * s);
+    line(g, [x + 60 * s, y - 64 * s, x + 66 * s, y - 60 * s], blk, 2 * s);
+    line(g, [x + 60 * s, y - 56 * s, x + 66 * s, y - 54 * s], blk, 2 * s);
+  });
+  ellipse(g, x + 95 * s, y - 56 * s, 9 * s, 6.5 * s, wh);
+  poly(g, [x + 98 * s, y - 62 * s, x + 104 * s, y - 62 * s, x + 101 * s, y - 58 * s], '#c86a5a');
+  circle(g, x + 86 * s, y - 70 * s, 3 * s, '#e8b020');
+  circle(g, x + 86.5 * s, y - 70 * s, 1.4 * s, blk);
+  // The long tail, curling up: banded in black, black at the tip.
+  const tail: Cmd[] = [
+    ['M', -62, -70], ['C', -100, -68, -104, -92, -90, -108], ['Q', -84, -112, -81, -106],
+    ['C', -93, -90, -91, -62, -62, -60], ['Z'],
+  ];
+  fillPath(g, x, y, s, tail, o);
+  within(g, x, y, s, tail, () => {
+    for (const [bx, by, a] of [[-78, -63, 1.4], [-90, -70, 1.1], [-96, -82, 0.6], [-93, -95, 0.2]] as const) {
+      ellipse(g, x + bx * s, y + by * s, 2.6 * s, 9 * s, blk, a);
+    }
+    circle(g, x - 86 * s, y - 108 * s, 7 * s, blk);
+  });
 }
 
 function gharial(g: G, x: number, y: number, s: number): void {
   const c = '#5f6b3a';
-  ellipse(g, x, y, 70 * s, 12 * s, c);
-  poly(g, [x + 60 * s, y - 4 * s, x + 140 * s, y, x + 140 * s, y + 4 * s, x + 60 * s, y + 6 * s], c);
-  circle(g, x + 140 * s, y + 1 * s, 6 * s, shade(c, -0.1));
-  poly(g, [x - 66 * s, y, x - 150 * s, y + 6 * s, x - 66 * s, y + 8 * s], c);
-  for (let k = -5; k <= 5; k++) poly(g, [x + k * 12 * s - 4 * s, y - 9 * s, x + k * 12 * s, y - 16 * s, x + k * 12 * s + 4 * s, y - 9 * s], shade(c, -0.2));
-  circle(g, x + 62 * s, y - 8 * s, 3 * s, '#e8d27a');
+  const dk = shade(c, -0.28);
+  groundShadow(g, x, y + 8 * s, 150 * s, 6 * s);
+  for (const [lx, d] of [[40, 1], [-40, 1]]) {
+    line(g, [x + lx * s, y + 4 * s, x + (lx + 8 * d) * s, y + 12 * s, x + (lx + 16 * d) * s, y + 12 * s], dk, 4 * s);
+  }
+  fillPath(g, x, y, s, [['M', -70, -2], ['C', -110, -6, -140, -2, -160, 2], ['C', -140, 6, -110, 8, -70, 6], ['Z']], c);
+  fillPath(g, x, y, s, [['M', -70, -2], ['C', -60, -14, -20, -16, 20, -14], ['C', 44, -14, 58, -10, 64, -6], ['L', 62, 6], ['C', 30, 10, -30, 10, -70, 6], ['Z']], vgrad(g, y - 16 * s, y + 10 * s, [shade(c, 0.12), c, '#b9b08a']));
+  // A ridge of scutes down the back and tail.
+  for (let k = -150; k < 50; k += 9) {
+    const top = k < -70 ? -2 - (k + 150) * 0.03 : -14 + Math.abs(k + 20) * 0.04;
+    poly(g, [x + k * s, y + top * s, x + (k + 4) * s, y + (top - 5) * s, x + (k + 8) * s, y + top * s], dk);
+  }
+  fillPath(g, x, y, s, [['M', 58, -10], ['C', 66, -14, 74, -12, 78, -8], ['L', 78, 4], ['C', 70, 6, 62, 6, 58, 4], ['Z']], c);
+  // The long thin snout, the ghara knob on its tip, the rows of teeth.
+  fillPath(g, x, y, s, [['M', 76, -6], ['L', 150, -2], ['C', 154, -2, 154, 4, 150, 4], ['L', 76, 4], ['Z']], c);
+  for (let k = 80; k < 148; k += 6) poly(g, [x + k * s, y + 4 * s, x + (k + 2) * s, y + 7 * s, x + (k + 4) * s, y + 4 * s], '#f2ecd8');
+  ellipse(g, x + 151 * s, y - 4 * s, 7 * s, 6 * s, dk);
+  circle(g, x + 66 * s, y - 12 * s, 3.4 * s, c);
+  circle(g, x + 66.5 * s, y - 12.6 * s, 1.6 * s, '#e8d27a');
 }
 
 function elephant(g: G, x: number, y: number, s: number, saddle = true): void {
-  const c = '#7d7b7a';
-  ellipse(g, x, y - 66 * s, 64 * s, 44 * s, c);
-  for (const lx of [-40, -16, 22, 44]) rect(g, x + lx * s - 10 * s, y - 34 * s, 20 * s, 34 * s, shade(c, -0.1));
-  circle(g, x + 60 * s, y - 80 * s, 30 * s, c);
-  ellipse(g, x + 44 * s, y - 78 * s, 20 * s, 26 * s, shade(c, -0.12));
-  g.beginPath();
-  g.moveTo(x + 84 * s, y - 72 * s);
-  g.quadraticCurveTo(x + 98 * s, y - 30 * s, x + 86 * s, y - 8 * s);
-  g.strokeStyle = c;
-  g.lineWidth = 12 * s;
-  g.stroke();
-  circle(g, x + 70 * s, y - 88 * s, 2.6 * s, '#222');
+  const c = '#7f7c7a';
+  const dk = shade(c, -0.22);
+  const leg = (lx: number, fill: string): void => {
+    fillPath(g, x, y, s, [['M', lx - 15, -54], ['L', lx - 15, -4], ['Q', lx, 2, lx + 15, -4], ['L', lx + 15, -54], ['Z']], fill);
+    for (const k of [-8, 0, 8]) ellipse(g, x + (lx + k) * s, y - 2 * s, 3.4 * s, 2.6 * s, '#d8cfbc');
+  };
+  groundShadow(g, x + 16 * s, y + 2 * s, 80 * s, 7 * s);
+  leg(-36, dk);
+  leg(26, dk);
+  // The Asian elephant's back rises to its highest point mid-way.
+  fillPath(g, x, y, s, [
+    ['M', -70, -60], ['C', -74, -100, -40, -122, -4, -120], ['C', 30, -124, 52, -108, 58, -90], ['L', 60, -60],
+    ['C', 58, -46, 46, -40, 30, -40], ['L', -50, -40], ['C', -66, -40, -70, -48, -70, -60], ['Z'],
+  ], vgrad(g, y - 124 * s, y - 40 * s, [shade(c, 0.16), c, shade(c, -0.1)]));
+  leg(-46, c);
+  leg(36, c);
+  // The domed head (two domes on top), the small ear, the trunk curling down.
+  fillPath(g, x, y, s, [
+    ['M', 52, -100], ['C', 52, -124, 70, -134, 80, -122], ['C', 86, -134, 102, -126, 100, -108], ['C', 104, -94, 102, -80, 96, -70],
+    ['L', 70, -66], ['C', 58, -70, 52, -84, 52, -100], ['Z'],
+  ], vgrad(g, y - 134 * s, y - 66 * s, [shade(c, 0.18), c]));
+  fillPath(g, x, y, s, [['M', 64, -108], ['C', 46, -110, 40, -90, 46, -74], ['C', 52, -66, 62, -70, 66, -80], ['Z']], dk);
+  const trunk: Cmd[] = [
+    ['M', 92, -78], ['C', 104, -60, 104, -40, 98, -22], ['C', 96, -14, 100, -8, 106, -8], ['L', 106, -2],
+    ['C', 94, -2, 88, -10, 90, -22], ['C', 94, -40, 92, -58, 82, -72], ['Z'],
+  ];
+  fillPath(g, x, y, s, trunk, c);
+  within(g, x, y, s, trunk, () => {
+    for (let k = -70; k < -12; k += 7) line(g, [x + 86 * s, y + k * s, x + 106 * s, y + (k + 2) * s], 'rgba(50, 46, 44, 0.3)', 1.2 * s);
+  });
+  fillPath(g, x, y, s, [['M', 90, -72], ['C', 100, -64, 108, -60, 115, -62], ['C', 108, -55, 98, -57, 88, -65], ['Z']], '#f1e8d2');
+  circle(g, x + 84 * s, y - 96 * s, 2.6 * s, '#1a1612');
+  circle(g, x + 84.8 * s, y - 96.8 * s, 0.8 * s, '#fff');
+  strokePath(g, x, y, s, [['M', -70, -84], ['C', -76, -70, -78, -58, -76, -48]], c, 3 * s);
+  ellipse(g, x - 76 * s, y - 45 * s, 3 * s, 5 * s, '#3a3530');
   if (saddle) {
-    rect(g, x - 34 * s, y - 112 * s, 60 * s, 12 * s, '#b2283a');
-    rect(g, x - 34 * s, y - 102 * s, 60 * s, 4 * s, '#e2b23a');
+    // A festival blanket, red with a gold border and tassels, and a seat on top.
+    const cloth: Cmd[] = [['M', -34, -118], ['C', -10, -126, 20, -126, 36, -114], ['L', 32, -80], ['C', 10, -74, -20, -74, -38, -82], ['Z']];
+    fillPath(g, x, y, s, cloth, '#b2283a');
+    within(g, x, y, s, cloth, () => {
+      for (let k = -24; k < 28; k += 12) circle(g, x + k * s, y - 100 * s, 2.4 * s, '#f2d27a');
+    });
+    strokePath(g, x, y, s, cloth, '#e2b23a', 3 * s);
+    for (let k = -36; k <= 32; k += 9) circle(g, x + k * s, y - (78 + Math.abs(k) * 0.08) * s, 2.2 * s, '#e2b23a');
+    rect(g, x - 24 * s, y - 132 * s, 50 * s, 10 * s, '#5a3220');
+    rect(g, x - 22 * s, y - 138 * s, 46 * s, 6 * s, '#c8342f');
+    line(g, [x - 24 * s, y - 146 * s, x + 26 * s, y - 146 * s], '#e2b23a', 2 * s);
+    for (const k of [-24, 26]) line(g, [x + k * s, y - 146 * s, x + k * s, y - 132 * s], '#e2b23a', 2 * s);
   }
 }
 
 function deer(g: G, x: number, y: number, s: number, c = '#b07a44'): void {
-  ellipse(g, x, y - 40 * s, 34 * s, 14 * s, c);
-  for (const lx of [-24, -14, 16, 26]) line(g, [x + lx * s, y - 32 * s, x + lx * s, y], c, 4 * s);
-  line(g, [x + 26 * s, y - 46 * s, x + 38 * s, y - 70 * s], c, 7 * s);
-  ellipse(g, x + 44 * s, y - 72 * s, 10 * s, 6 * s, c);
-  line(g, [x + 38 * s, y - 76 * s, x + 32 * s, y - 100 * s, x + 26 * s, y - 106 * s], '#6b4a2a', 2.5 * s);
-  line(g, [x + 42 * s, y - 78 * s, x + 46 * s, y - 102 * s, x + 54 * s, y - 108 * s], '#6b4a2a', 2.5 * s);
+  const dk = shade(c, -0.25);
+  const antler = '#7a5a3a';
+  groundShadow(g, x + 6 * s, y + 1 * s, 40 * s, 4 * s);
+  line(g, [x + 30 * s, y - 38 * s, x + 31 * s, y - 18 * s, x + 30 * s, y], dk, 3.6 * s);
+  line(g, [x - 20 * s, y - 38 * s, x - 14 * s, y - 20 * s, x - 18 * s, y], dk, 3.6 * s);
+  const body: Cmd[] = [['M', -34, -44], ['C', -36, -58, -20, -62, 0, -60], ['C', 16, -62, 30, -58, 36, -48], ['C', 38, -40, 30, -34, 18, -34], ['L', -22, -34], ['C', -32, -34, -34, -40, -34, -44], ['Z']];
+  fillPath(g, x, y, s, body, c);
+  within(g, x, y, s, body, () => {
+    ellipse(g, x, y - 34 * s, 28 * s, 4.5 * s, '#f4ead8');
+    // The chital's white spots, in rows along the flank.
+    for (let row = 0; row < 3; row++) {
+      for (let k = -28; k < 30; k += 7) circle(g, x + (k + row * 3) * s, y - (54 - row * 6) * s, 1.4 * s, '#fbf6ea');
+    }
+  });
+  // Neck and head, the big ears, the lyre-shaped antlers.
+  fillPath(g, x, y, s, [['M', 24, -56], ['C', 30, -70, 34, -80, 40, -88], ['L', 48, -86], ['C', 44, -74, 40, -60, 36, -48], ['Z']], c);
+  fillPath(g, x, y, s, [['M', 38, -92], ['C', 44, -98, 52, -96, 56, -90], ['L', 66, -84], ['C', 66, -80, 60, -80, 54, -82], ['C', 46, -82, 38, -84, 38, -92], ['Z']], c);
+  fillPath(g, x, y, s, [['M', 40, -92], ['C', 30, -100, 26, -100, 28, -96], ['C', 30, -92, 36, -90, 40, -90], ['Z']], dk);
+  circle(g, x + 66 * s, y - 83 * s, 1.8 * s, '#2a2420');
+  circle(g, x + 50 * s, y - 90 * s, 1.7 * s, '#1a1612');
+  for (const d of [0, 5]) {
+    strokePath(g, x, y, s, [['M', 42 + d, -96], ['C', 36 + d, -110, 44 + d, -120, 38 + d, -132]], antler, 2.2 * s);
+    strokePath(g, x, y, s, [['M', 40 + d, -104], ['L', 47 + d, -110]], antler, 1.8 * s);
+    strokePath(g, x, y, s, [['M', 40 + d, -126], ['L', 46 + d, -134]], antler, 1.6 * s);
+  }
+  line(g, [x + 22 * s, y - 38 * s, x + 24 * s, y - 18 * s, x + 22 * s, y], c, 4 * s);
+  line(g, [x - 28 * s, y - 40 * s, x - 20 * s, y - 20 * s, x - 25 * s, y], c, 4.4 * s);
+  for (const hx of [22, -25, 30, -18]) ellipse(g, x + hx * s, y, 2.4 * s, 1.4 * s, '#2a2420');
+  line(g, [x - 34 * s, y - 50 * s, x - 38 * s, y - 42 * s], '#f4ead8', 3 * s);
 }
 
 // --- transport ---------------------------------------------------------------------
@@ -559,25 +774,52 @@ function helicopter(g: G, x: number, y: number, s: number): void {
 }
 
 function glider(g: G, x: number, y: number, s: number, c1 = '#e8452c', c2 = '#f2c230'): void {
-  g.beginPath();
-  g.ellipse(x, y, 70 * s, 22 * s, 0, Math.PI, 0);
-  g.fillStyle = c1;
-  g.fill();
-  g.beginPath();
-  g.ellipse(x, y, 70 * s, 22 * s, 0, Math.PI * 1.35, Math.PI * 1.65);
-  g.lineTo(x, y);
-  g.fillStyle = c2;
-  g.fill();
-  for (const dx of [-60, -25, 25, 60]) line(g, [x + dx * s, y, x, y + 60 * s], 'rgba(40,40,40,0.6)', 1);
-  person(g, x, y + 90 * s, 0.38 * s * 2, '#333344', { arms: 'out' });
+  // The wing: an arched crescent of cells, a chevron of the second colour.
+  const wing: Cmd[] = [['M', -72, 10], ['C', -66, -26, 66, -26, 72, 10], ['C', 60, -8, -60, -8, -72, 10], ['Z']];
+  fillPath(g, x, y, s, wing, c1);
+  within(g, x, y, s, wing, () => {
+    for (let k = -66; k <= 66; k += 8) line(g, [x + k * s, y - 24 * s, x + k * 1.05 * s, y + 12 * s], shade(c1, -0.18), 1.2 * s);
+    poly(g, [x - 30 * s, y + 12 * s, x, y - 26 * s, x + 30 * s, y + 12 * s, x + 18 * s, y + 12 * s, x, y - 12 * s, x - 18 * s, y + 12 * s], c2);
+    rect(g, x - 72 * s, y - 26 * s, 10 * s, 40 * s, c2);
+    rect(g, x + 62 * s, y - 26 * s, 10 * s, 40 * s, c2);
+  });
+  // The lines fanning down to the pilot, sitting back in the harness.
+  for (const dx of [-64, -44, -22, 22, 44, 64]) {
+    line(g, [x + dx * s, y + (Math.abs(dx) > 50 ? 6 : -2) * s, x + Math.sign(dx) * 3 * s, y + 66 * s], 'rgba(40, 40, 40, 0.5)', 0.9);
+  }
+  const py = y + 72 * s;
+  ellipse(g, x, py, 7 * s, 5 * s, '#2b5fa8');
+  circle(g, x + 1 * s, py - 9 * s, 4 * s, '#f6f6f6');
+  line(g, [x + 3 * s, py + 2 * s, x + 12 * s, py + 3 * s], '#2a3a5a', 3 * s);
+  line(g, [x - 4 * s, py - 4 * s, x - 6 * s, py - 14 * s], '#2a3a5a', 1.6 * s);
+  line(g, [x + 4 * s, py - 4 * s, x + 6 * s, py - 14 * s], '#2a3a5a', 1.6 * s);
 }
 
+/** A high-wing turboprop in flight, side on, nose right. */
 function plane(g: G, x: number, y: number, s: number): void {
-  ellipse(g, x, y, 90 * s, 14 * s, '#f6f6f6');
-  poly(g, [x - 10 * s, y, x + 30 * s, y, x - 30 * s, y + 60 * s, x - 50 * s, y + 60 * s], '#e4e4e4');
-  poly(g, [x - 10 * s, y, x + 30 * s, y, x - 30 * s, y - 50 * s, x - 46 * s, y - 50 * s], '#ececec');
-  poly(g, [x - 76 * s, y, x - 92 * s, y - 40 * s, x - 76 * s, y - 40 * s, x - 60 * s, y], '#c8102e');
-  for (let k = -4; k <= 5; k++) circle(g, x + k * 12 * s, y - 3 * s, 2.5 * s, '#3a6aa8');
+  const white = '#f7f7f4';
+  const blue = '#1f4f9a';
+  // Far engine and the far tailplane, a shade darker.
+  rect(g, x - 2 * s, y - 6 * s, 30 * s, 9 * s, '#dcdcd8');
+  // The fuselage.
+  const hull: Cmd[] = [['M', -88, -2], ['C', -70, -10, -40, -14, 30, -14], ['C', 64, -14, 86, -10, 94, -2], ['C', 88, 8, 64, 10, 30, 10], ['L', -40, 10], ['C', -66, 10, -80, 6, -88, -2], ['Z']];
+  fillPath(g, x, y, s, hull, white);
+  within(g, x, y, s, hull, () => {
+    rect(g, x - 90 * s, y + 4 * s, 186 * s, 8 * s, blue);
+    rect(g, x - 90 * s, y + 1 * s, 186 * s, 1.6 * s, '#e2b23a');
+    for (let k = -50; k < 60; k += 9) rect(g, x + k * s, y - 7 * s, 4.5 * s, 5 * s, '#2a3442');
+    poly(g, [x + 78 * s, y - 9 * s, x + 90 * s, y - 4 * s, x + 76 * s, y - 4 * s], '#2a3442');
+  });
+  // The T-tail with its emblem.
+  poly(g, [x - 86 * s, y - 6 * s, x - 62 * s, y - 10 * s, x - 76 * s, y - 50 * s, x - 90 * s, y - 50 * s], blue);
+  circle(g, x - 80 * s, y - 32 * s, 6 * s, '#e2b23a');
+  poly(g, [x - 87 * s, y - 27 * s, x - 81 * s, y - 37 * s, x - 77 * s, y - 31 * s, x - 74 * s, y - 34 * s, x - 70 * s, y - 27 * s], '#fff');
+  rect(g, x - 96 * s, y - 52 * s, 30 * s, 3 * s, white);
+  // The high wing seen edge on, the near engine and its propeller.
+  rect(g, x - 18 * s, y - 17 * s, 50 * s, 4 * s, '#e8e8e4');
+  fillPath(g, x, y, s, [['M', 2, -14], ['L', 34, -14], ['C', 40, -12, 40, -4, 34, -2], ['L', 2, -2], ['Z']], white);
+  ellipse(g, x + 40 * s, y - 8 * s, 2.5 * s, 18 * s, 'rgba(60, 64, 70, 0.35)');
+  circle(g, x + 40 * s, y - 8 * s, 2.6 * s, '#9aa0a8');
 }
 
 function raft(g: G, x: number, y: number, s: number): void {
@@ -1055,7 +1297,7 @@ const RECIPES: Record<string, Recipe> = {
   // Eastern
   'eas-photo-ilam': (g, r) => { sky(g, 'mist', r, 160); hills(g, r, 160, 20, '#6f9440'); for (let i = 0; i < 8; i++) { hills(g, r, 180 + i * 22, 6, i % 2 ? '#3e8d3a' : '#4f9a45', 1.2); } person(g, 380, 250, 0.9, '#c8342f', { skirt: true }); },
   'eas-photo-kanchenjunga': (g, r) => { sky(g, 'sunrise', r, 260); range(g, r, 260, [[90, 150], [250, 210], [320, 190], [430, 140]], '#d98a6a'); hills(g, r, 280, 14, '#3a4a5a'); },
-  'eas-photo-koshi': (g, r) => { sky(g, 'day', r, 180); water(g, r, 180, 160, '#7fb8c8', '#4a8aa0'); grass(g, r, 180, 220, 80, '#8a9a3a'); birds(g, r, 24, 20, 40, 440, 120, '#f6f6f6'); for (const x of [120, 260, 360]) { ellipse(g, x, 260, 16, 10, '#f6f6f6'); line(g, [x, 268, x, 300], '#e8a435', 2); } },
+  'eas-photo-koshi': (g, r) => { sky(g, 'day', r, 180); water(g, r, 180, 160, '#7fb8c8', '#4a8aa0'); grass(g, r, 180, 220, 80, '#8a9a3a'); birds(g, r, 24, 20, 40, 440, 120, '#f6f6f6'); for (const [x, k] of [[120, 1.1], [260, 1.3], [360, 1]] as const) egret(g, x, 300, k); },
   'eas-photo-antu': (g, r) => { sky(g, 'sunrise', r, 220); sun(g, 240, 220, 34, '#ffe08a'); hills(g, r, 220, 10, '#e8a87a'); hills(g, r, 260, 18, '#7a5a6a'); hills(g, r, 300, 16, '#3a3a4a'); crowd(g, r, 335, 4, ['#222', '#333'], { arms: 'out' }); },
   'eas-photo-pathibhara': (g, r) => { sky(g, 'day', r, 260); range(g, r, 260, [[240, 170]], '#6f7c8f', false); poly(g, [200, 100, 280, 100, 240, 90], '#8a7a6a'); house(g, 240, 104, 0.6, '#c8342f', '#e2b23a'); flags(g, 120, 140, 240, 70, 10, 10); flags(g, 240, 70, 360, 140, 10, 10); hills(g, r, 300, 14, '#4f6a3a'); },
   'eas-souvenir-tea': (g, r) => { table(g, r, 0, '#9a6a3a'); teacup(g, 260, 300, 1.4); for (let i = 0; i < 7; i++) tealeaf(g, 60 + r() * 360, 40 + r() * 110, 1, r() * 3); },

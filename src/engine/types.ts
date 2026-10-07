@@ -90,11 +90,23 @@ export type Deck = {
   discard: string[];
 };
 
+/** What a traveler's pawn wears on its head — cosmetic only. */
+export type HatStyle = 'sunhat' | 'topi' | 'cap' | 'beanie';
+
 export type Player = {
   id: number;
   name: string;
   /** Hex colour, matched to the printed traveler standees. */
   color: string;
+  /** Cosmetic: the pawn's hat. */
+  hat?: HatStyle;
+  /** On one device, a traveler the computer plays. The rules never look at this. */
+  bot?: boolean;
+  /**
+   * Medals won in friendly games at the Chautari. Just for fun: they never
+   * count toward the score or decide the winner.
+   */
+  medals?: number;
   nodeId: string;
   /** Entry tickets held, one per sub-section. */
   tickets: SectionId[];
@@ -203,4 +215,9 @@ export type Action =
   | { type: 'PLAY_MINIGAME'; result?: MinigameResult }
   | { type: 'DRAW_CARD' }
   | { type: 'RESOLVE_CARD' }
-  | { type: 'END_TURN' };
+  | { type: 'END_TURN' }
+  /**
+   * A friendly game at the Chautari finished. Hands out medals and logs it;
+   * touches nothing else — not the score, the turn, or the dice.
+   */
+  | { type: 'CHAUTARI_RESULT'; game: string; winners: number[] };

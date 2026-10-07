@@ -7,7 +7,9 @@ import { nodeAt } from '../engine/board.ts';
 import { counterOffer } from '../engine/autoplay.ts';
 import { current, scoreFor } from '../engine/reducer.ts';
 import type { Action, GameState } from '../engine/types.ts';
-import { SECTION_LABEL } from '../render/palette.ts';
+import { SECTION_LABEL, tripName } from '../render/palette.ts';
+import { avatar } from './avatar.ts';
+import { ticketStub, tripsOf } from './tickets.ts';
 import { countUp } from './cardview.ts';
 
 /** Extra context when playing online. */
@@ -20,6 +22,8 @@ export type HudContext = {
   away?: number[];
   /** The room code, shown at the top. */
   room?: string;
+  /** The Chautari button: shown between turns, for friendly games. */
+  chautari?: { enabled: boolean; open: () => void };
 };
 
 export type Hud = {
@@ -58,10 +62,19 @@ function promptFor(state: GameState): string {
       return 'Travelling…';
     case 'await-branch':
       return 'The road splits. Choose which way to go — click a glowing tile or a button below.';
-    case 'ticket-counter':
-      return 'Ticket Counter. Buy an entry ticket here for a deeper trip, or travel on.';
-    case 'checkpoint-minigame':
-      return `${where} — everyone stops here, whatever they spun. Win the mini-game to earn an entry ticket.`;
+    case 'ticket-counter': {
+      const offer = counterOffer(state);
+      return offer
+        ? `${where}. This counter sells the ${tripName(offer)} ticket — buy it to open that trip, or travel on.`
+        : `${where}. You already hold every ticket this counter sells — travel on.`;
+    }
+    case 'checkpoint-minigame': {
+      const reward = state.pendingMinigame?.ticketReward;
+      const have = reward && player.tickets.includes(reward);
+      return reward
+        ? `${where} — everyone stops here, whatever they spun. Win the mini-game for the ${tripName(reward)} ticket${have ? ' (you already hold it)' : ''}.`
+        : `${where} — everyone stops here, whatever they spun. Win the mini-game to earn an entry ticket.`;
+    }
     case 'await-draw':
       return `Stopped in ${SECTION_LABEL[node.section]}. Draw from this section's deck.`;
     case 'card-minigame':
@@ -105,7 +118,7 @@ export function createHud(
       // --- whose turn ---
       const turn = el('div', 'hud-turn');
       turn.append(
-        swatch(active.color),
+        avatar(active.color, active.hat, 30),
         text(`${active.name} · turn ${state.turn}`),
       );
       root.append(turn);
@@ -140,7 +153,7 @@ export function createHud(
         const offer = counterOffer(state);
         if (offer) {
           actions.append(
-            button(`Buy ${SECTION_LABEL[offer]} ticket`, () =>
+            button(`Buy the ${tripName(offer)} ticket`, () =>
               dispatch({ type: 'CLAIM_COUNTER_TICKET', section: offer }), busy),
           );
         }
@@ -149,7 +162,24 @@ export function createHud(
         );
       }
 
+      // The ticket on offer here, so you can see exactly where it takes you.
+      if (state.phase === 'ticket-counter' || state.phase === 'checkpoint-minigame') {
+        const offer = state.phase === 'ticket-counter' ? counterOffer(state) : state.pendingMinigame?.ticketReward;
+        if (offer) {
+          const preview = el('div', 'hud-ticket');
+          preview.append(ticketStub(offer, { size: 'big' }));
+          root.append(preview);
+        }
+      }
+
       if (actions.childElementCount > 0) root.append(actions);
+
+      // --- the Chautari: friendly games between turns ---
+      if (ctx.chautari && (state.phase === 'await-roll' || state.phase === 'game-over')) {
+        const fun = button('🌳 Chautari — friendly games', ctx.chautari.open, !ctx.chautari.enabled, 'ghost hud-chautari');
+        fun.title = 'Play each other for medals between turns — just for fun, never part of the score';
+        root.append(fun);
+      }
 
       // --- scoreboard ---
       root.append(el('p', 'section-title', 'Scoreboard'));
@@ -163,12 +193,23 @@ export function createHud(
         if (ctx.away?.includes(player.id)) names.append(el('span', 'away', 'away'));
 
         const bits: string[] = [`${player.passport.length} card(s)`];
-        if (player.tickets.length > 0) {
-          bits.push(`🎫 ${player.tickets.map((t) => SECTION_LABEL[t]).join(', ')}`);
-        }
         if (player.singleDieTurns > 0) bits.push(`🚲 ${player.singleDieTurns}`);
         if (player.finished) bits.push('flown home');
+        if (player.bot) bits.push('🤖 computer');
         names.append(el('span', 'meta', bits.join(' · ')));
+        if (player.medals) {
+          const medals = el('span', 'medals', `🏅 ${player.medals}`);
+          medals.title = 'Chautari medals — just for fun, not part of the score';
+          names.append(medals);
+        }
+        // Tickets held, as little coloured tickets.
+        if (player.tickets.length > 0) {
+          const held = el('span', 'hud-tickets');
+          for (const trip of tripsOf(state.board)) {
+            if (player.tickets.includes(trip)) held.append(ticketStub(trip, { size: 'chip' }));
+          }
+          names.append(held);
+        }
 
         const score = scoreFor(state, player);
         const scoreEl = el('span', 'score', String(shown.get(player.id) ?? score));
@@ -176,7 +217,7 @@ export function createHud(
         shown.set(player.id, score);
         row.title = `Show ${player.name}'s cards`;
         row.addEventListener('click', () => onPickPlayer(player.id));
-        row.append(swatch(player.color), names, scoreEl);
+        row.append(avatar(player.color, player.hat, 30), names, scoreEl);
         players.append(row);
       }
       root.append(players);
